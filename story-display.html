@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>사연 이벤트 — 썸잇 파티</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#06060c;color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;overflow:hidden}
+.stage{width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;background:radial-gradient(ellipse 80% 60% at 50% 38%,#1c0830 0%,#06060c 65%)}
+.ring{position:absolute;border-radius:999px;border:1px solid rgba(255,60,135,0.08);pointer-events:none;top:50%;left:50%;transform:translate(-50%,-50%)}
+.r1{width:380px;height:380px}
+.r2{width:580px;height:580px}
+.r3{width:820px;height:820px}
+.r4{width:1100px;height:1100px;border-color:rgba(139,92,246,0.05)}
+
+.timer-bar{position:absolute;top:0;left:0;height:3px;background:linear-gradient(90deg,#ff3c87,#8b5cf6);width:0}
+
+.brand{position:absolute;top:28px;left:44px;display:flex;align-items:center;gap:10px;color:rgba(255,255,255,0.3);font-size:15px;font-weight:900;letter-spacing:.16em}
+.brand em{color:#ff3c87;font-style:normal}
+
+.badge{position:absolute;top:24px;right:40px;padding:9px 20px;border-radius:999px;background:rgba(255,60,135,0.1);border:1px solid rgba(255,60,135,0.28);color:#ff8fbd;font-size:15px;font-weight:900;letter-spacing:.04em}
+
+.new-toast{position:absolute;top:76px;left:50%;transform:translateX(-50%) translateY(-14px);padding:11px 26px;border-radius:999px;background:rgba(255,60,135,0.9);color:#fff;font-size:15px;font-weight:900;opacity:0;pointer-events:none;transition:opacity .35s,transform .35s;white-space:nowrap}
+.new-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.story-wrap{width:min(900px,88vw);text-align:center;position:relative;z-index:2}
+.story-label{display:inline-flex;align-items:center;gap:9px;margin-bottom:32px;padding:10px 22px;border-radius:999px;background:rgba(255,60,135,0.1);border:1px solid rgba(255,60,135,0.3);color:#ff8fbd;font-size:17px;font-weight:900;letter-spacing:.08em}
+.story-text{font-size:clamp(26px,4.8vw,58px);line-height:1.5;font-weight:700;letter-spacing:-.02em;word-break:keep-all;color:#fff;text-shadow:0 2px 40px rgba(255,60,135,0.15)}
+.story-text.animate{animation:storyIn .65s cubic-bezier(.22,1,.36,1) both}
+@keyframes storyIn{from{opacity:0;transform:translateY(36px) scale(.97)}to{opacity:1;transform:none}}
+
+.empty{text-align:center;color:rgba(255,255,255,0.28);font-weight:700;font-size:22px}
+.empty .ico{font-size:72px;display:block;margin-bottom:22px;opacity:.45}
+
+.dots{position:absolute;bottom:46px;left:50%;transform:translateX(-50%);display:flex;gap:7px;align-items:center;z-index:2}
+.dot{width:7px;height:7px;border-radius:999px;background:rgba(255,255,255,0.18);cursor:pointer;transition:all .3s}
+.dot.active{width:26px;background:#ff3c87}
+
+.controls{position:absolute;bottom:32px;right:38px;display:flex;gap:8px;z-index:5;opacity:.25;transition:opacity .2s}
+.controls:hover{opacity:1}
+.cbtn{width:48px;height:48px;border-radius:13px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.06);color:#fff;font-size:20px;cursor:pointer;display:grid;place-items:center;transition:background .15s}
+.cbtn:hover{background:rgba(255,255,255,0.15)}
+
+.hint{position:absolute;bottom:38px;left:44px;color:rgba(255,255,255,0.22);font-size:12px;font-weight:700;letter-spacing:.04em;z-index:2}
+</style>
+</head>
+<body>
+<script src="firebase-config.js"></script>
+<script type="module">
+import{initializeApp}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import{getFirestore,collection,query,where,onSnapshot}from'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const app=initializeApp(window.SUMIT_FIREBASE_CONFIG);
+const db=getFirestore(app);
+const FLOOR='floor2';
+const AUTO_MS=9000;
+
+let stories=[],cur=0,timer=null,paused=false;
+
+const wrapEl=document.getElementById('storyWrap');
+const dotsEl=document.getElementById('dots');
+const badgeEl=document.getElementById('badge');
+const barEl=document.getElementById('timerBar');
+const toastEl=document.getElementById('toast');
+const pauseBtn=document.getElementById('pauseBtn');
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function show(idx){
+  if(!stories.length){
+    wrapEl.innerHTML='<div class="empty"><span class="ico">💭</span>사연을 기다리고 있어요…</div>';
+    dotsEl.innerHTML='';badgeEl.textContent='';stopBar();return;
+  }
+  cur=Math.max(0,Math.min(idx,stories.length-1));
+  const s=stories[cur];
+  wrapEl.innerHTML=`<div class="story-label">💌 사연 ${cur+1}</div><div class="story-text" id="storyText">${esc(s.story)}</div>`;
+  requestAnimationFrame(()=>{
+    const t=document.getElementById('storyText');
+    if(t){t.classList.remove('animate');void t.offsetWidth;t.classList.add('animate');}
+  });
+  badgeEl.textContent=`${cur+1} / ${stories.length}`;
+  const shown=stories.slice(-Math.min(stories.length,14));
+  const offset=stories.length>14?stories.length-14:0;
+  dotsEl.innerHTML=shown.map((_,i)=>`<div class="dot${(i+offset)===cur?' active':''}" data-i="${i+offset}"></div>`).join('');
+  dotsEl.querySelectorAll('.dot').forEach(d=>d.addEventListener('click',()=>{stopAuto();show(+d.dataset.i);startAuto();}));
+  if(!paused)startBar();
+}
+
+function startBar(){
+  stopBar();
+  barEl.style.transition='none';barEl.style.width='0%';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    barEl.style.transition=`width ${AUTO_MS}ms linear`;barEl.style.width='100%';
+  }));
+}
+function stopBar(){barEl.style.transition='none';barEl.style.width='0%';}
+
+function startAuto(){
+  stopAuto();
+  if(paused||!stories.length)return;
+  timer=setInterval(()=>show((cur+1)%stories.length),AUTO_MS);
+  startBar();
+}
+function stopAuto(){if(timer){clearInterval(timer);timer=null;}stopBar();}
+
+document.getElementById('prevBtn').addEventListener('click',()=>{stopAuto();show(cur-1);startAuto();});
+document.getElementById('nextBtn').addEventListener('click',()=>{stopAuto();show(cur+1);startAuto();});
+pauseBtn.addEventListener('click',()=>{
+  paused=!paused;
+  pauseBtn.textContent=paused?'▶':'⏸';
+  if(paused)stopAuto();else startAuto();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' '){e.preventDefault();stopAuto();show(cur+1);startAuto();}
+  else if(e.key==='ArrowLeft'){e.preventDefault();stopAuto();show(cur-1);startAuto();}
+  else if(e.key==='p'||e.key==='P')pauseBtn.click();
+});
+
+let prevLen=-1;
+const q=query(collection(db,'stories'),where('floor','==',FLOOR));
+onSnapshot(q,snap=>{
+  const fresh=snap.docs.map(d=>d.data()).sort((a,b)=>(a.time||0)-(b.time||0));
+  const hadNew=prevLen>=0&&fresh.length>prevLen;
+  prevLen=fresh.length;
+  stories=fresh;
+  if(hadNew){
+    toastEl.classList.add('show');setTimeout(()=>toastEl.classList.remove('show'),2800);
+    stopAuto();show(stories.length-1);startAuto();
+  } else {
+    show(cur);
+    if(!timer&&!paused)startAuto();
+  }
+});
+</script>
+
+<div class="stage">
+  <div class="ring r1"></div>
+  <div class="ring r2"></div>
+  <div class="ring r3"></div>
+  <div class="ring r4"></div>
+
+  <div class="timer-bar" id="timerBar"></div>
+
+  <div class="brand">SUMIT <em>PARTY</em> &nbsp;—&nbsp; 사연 이벤트</div>
+  <div class="badge" id="badge"></div>
+  <div class="new-toast" id="toast">💌 새 사연이 도착했어요!</div>
+
+  <div class="story-wrap" id="storyWrap">
+    <div class="empty"><span class="ico">💭</span>사연을 기다리고 있어요…</div>
+  </div>
+
+  <div class="dots" id="dots"></div>
+
+  <div class="hint">← → 키 또는 Space로 이동 &nbsp;·&nbsp; P 일시정지</div>
+
+  <div class="controls">
+    <button class="cbtn" id="prevBtn" title="이전 ←">‹</button>
+    <button class="cbtn" id="pauseBtn" title="일시정지 P">⏸</button>
+    <button class="cbtn" id="nextBtn" title="다음 →">›</button>
+  </div>
+</div>
+</body>
+</html>

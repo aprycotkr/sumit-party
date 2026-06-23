@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="format-detection" content="telephone=no" />
+<title>썸잇 — 썸을 완성하는 시간</title>
+<link rel="stylesheet" href="style.css" />
+<link rel="icon" type="image/png" href="/attached_assets/썸잇로고_1765977271120.png" />
+</head>
+<body>
+<main class="wrap">
+  <section id="entry">
+    <div style="text-align:center; margin-bottom:40px;">
+      <img src="attached_assets/썸잇로고_1765977271120.png" alt="썸잇 파티" style="max-width:200px; height:auto; margin-bottom:0;">
+    </div>
+    <div class="entry-form">
+      <label>닉네임</label>
+      <input id="nick" placeholder="닉네임을 입력하세요" style="margin-bottom:16px;" />
+      <label>이름</label>
+      <input id="realName" placeholder="실제 이름을 입력하세요" style="margin-bottom:16px;" />
+      <label>나이</label>
+      <input id="age" type="text" inputmode="numeric" pattern="[0-9]*" min="19" max="99" placeholder="나이를 입력하세요" style="margin-bottom:16px;" />
+      <label>전화번호</label>
+      <input id="phoneNumber" type="tel" placeholder="010-0000-0000" style="margin-bottom:16px;" />
+      <label>성별</label>
+      <select id="gender" style="margin-bottom:16px;">
+        <option value="">성별 선택</option>
+        <option value="male">남성</option>
+        <option value="female">여성</option>
+      </select>
+      <label>테이블 번호 (안내받은 테이블)</label>
+      <select id="tableNumberSelect" style="margin-bottom:16px;">
+        <option value="">테이블 선택</option>
+        <option value="1">1번 테이블</option>
+        <option value="2">2번 테이블</option>
+        <option value="3">3번 테이블</option>
+        <option value="4">4번 테이블</option>
+        <option value="5">5번 테이블</option>
+        <option value="6">6번 테이블</option>
+        <option value="7">7번 테이블</option>
+        <option value="8">8번 테이블</option>
+        <option value="9">9번 테이블</option>
+        <option value="10">10번 테이블</option>
+        <option value="11">11번 테이블</option>
+        <option value="12">12번 테이블</option>
+        <option value="13">13번 테이블</option>
+        <option value="14">14번 테이블</option>
+        <option value="staff">🎪 스탭 (테이블 없음)</option>
+      </select>
+      <input id="floor" type="hidden" value="floor2" />
+      <input id="second_party" type="checkbox" checked style="display:none;" />
+      <input type="hidden" id="secondPartyYes" />
+      <input type="hidden" id="secondPartyNo" />
+      <label>🔑 입장 PIN 번호 <span style="font-size:11px; font-weight:500; color:rgba(255,255,255,0.45);">(스탭에게 문의)</span></label>
+      <input id="entryPin" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 입력" style="margin-bottom:20px; letter-spacing:6px; font-size:24px; font-weight:800; text-align:center;" maxlength="4" autocomplete="one-time-code" />
+      <button id="enterBtn" style="padding:16px; font-size:16px; font-weight:700;">파티 입장하기</button>
+    </div>
+  </section>
+
+  <section id="main" class="hidden">
+    <div id="timerDisplay" class="hidden" style="background:linear-gradient(135deg, rgba(255,60,135,0.3), rgba(255,60,135,0.15)); border:3px solid #ff3c87; border-radius:16px; padding:16px; margin-bottom:16px; text-align:center;">
+      <div style="font-size:13px; color:#ff9ebc; margin-bottom:6px; font-weight:600;">⏱️ 현재 라운드 남은 시간</div>
+      <div id="timerText" style="font-size:36px; font-weight:800; color:#fff; font-family:monospace; text-shadow:0 0 20px rgba(255,60,135,0.5);">00:00</div>
+      <div id="partyStatus" style="font-size:14px; font-weight:700; color:#10b981; margin-top:8px;">🎉 1부 진행중</div>
+    </div>
+    <div class="card" style="background:linear-gradient(135deg, rgba(168,85,247,0.2), rgba(168,85,247,0.12)); border:2px solid rgba(255,255,255,0.3); margin-bottom:20px;">
+      <h2 id="greeting" style="color:#f0f0f0; font-size:1.6em; margin-bottom:8px; text-align:center; font-weight:700; letter-spacing:0.5px;"></h2>
+      <div id="teamInfoDisplay" class="hidden second-party-banner">
+        <div class="second-party-kicker">SECOND SESSION</div>
+        <div class="second-party-title">2부 파티가 시작됐습니다!</div>
+        <div class="second-party-subtitle">이제 이름과 나이가 공개됩니다</div>
+        <div id="teamNumberText" style="display:none; font-size:32px; font-weight:800; color:#10b981;"></div>
+      </div>
+      <div id="mySecondPartyStatus" style="text-align:center; margin-top:10px; font-size:14px; font-weight:600;"></div>
+      <h3 id="farewell" style="color:#f0f0f0; margin-bottom:0; text-align:center; font-weight:500;"></h3>
+    </div>
+
+    <div id="tableRotationCard" style="display:none; background:linear-gradient(135deg, rgba(255,193,7,0.3), rgba(255,193,7,0.15)); border:3px solid #ffc107; border-radius:16px; padding:20px; margin-bottom:16px; text-align:center;">
+      <div style="font-size:13px; color:#ffd700; margin-bottom:8px; font-weight:600;">🪑 현재 테이블</div>
+      <div id="nextTableDisplay" style="font-size:56px; font-weight:800; color:#fff; font-family:monospace; text-shadow:0 0 20px rgba(255,193,7,0.7);">-</div>
+      <div id="tableRotationMsg" style="font-size:15px; color:#ffd700; font-weight:600; margin-top:6px;">자리배치 대기중...</div>
+      <div id="myCurrentTable" style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:6px;"></div>
+    </div>
+
+    <!-- 닉네임 변경 + 테이블 번호 변경 (접기 가능) -->
+    <details class="card edit-settings-card" style="margin-bottom:12px; padding:14px 16px;">
+      <summary>✏️ 닉네임 &amp; 테이블 변경</summary>
+      <div class="edit-settings-body" style="display:flex; gap:12px;">
+        <!-- 닉네임 변경 -->
+        <div style="flex:1; min-width:0;">
+          <h3 style="font-size:13px; margin-bottom:8px;">닉네임</h3>
+          <div style="display:flex; gap:6px;">
+            <input id="newNickInput" placeholder="새 닉네임" style="flex:1; min-width:0; padding:9px 8px; font-size:13px;" />
+            <button id="changeNickBtn" style="width:auto; padding:9px 12px; font-size:13px; white-space:nowrap;">변경</button>
+          </div>
+          <p style="margin-top:6px; font-size:11px; color:#ff6eb4;">⚠️ 변경 후 스탭에게 알려주세요</p>
+        </div>
+        <!-- 구분선 -->
+        <div style="width:1px; background:rgba(255,255,255,0.1); margin:4px 0;"></div>
+        <!-- 테이블 번호 변경 -->
+        <div style="flex:1; min-width:0;">
+          <h3 style="font-size:13px; margin-bottom:8px;">테이블</h3>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <select id="changeTableSelect" style="flex:1; min-width:0; padding:9px 6px; font-size:13px; background:#2a2a3e; color:#fff; border:1px solid rgba(255,255,255,0.2); border-radius:8px;">
+              <option value="">테이블 선택</option>
+            </select>
+            <button id="changeTableBtn" style="width:auto; padding:9px 12px; font-size:13px; background:#ffc107; color:#1a1a2e; font-weight:700; white-space:nowrap;">변경</button>
+          </div>
+          <p style="margin-top:6px; font-size:11px; color:#aaa;">현재: <strong id="currentTableDisplay" style="color:#ffc107;">-</strong>번</p>
+        </div>
+      </div>
+    </details>
+
+    <!-- 테이블 배치도 -->
+    <div class="card" style="padding:16px; margin-bottom:12px;">
+      <h3 style="font-size:14px; margin-bottom:12px; text-align:center;">🗺️ 테이블 배치도</h3>
+      <div style="font-size:11px; color:#bdbdbd; margin-bottom:10px; text-align:center;"><span style="color:#64b5f6;">● 남</span> &nbsp; <span style="color:#f48fb1;">● 여</span></div>
+      <div id="participantTableMap"></div>
+    </div>
+
+    <!-- 나의 현황 -->
+    <div class="card my-status-card" style="padding:16px; margin-bottom:12px;">
+      <h3>나의 현황</h3>
+      <div class="my-status-grid">
+        <div class="my-status-item likes" id="homeReceivedLikesCard">
+          <span class="my-status-lock">▢</span>
+          <div>
+            <strong>받은 호감</strong>
+            <p id="homeReceivedLikeDetail">호감을 누구한테 받았는지는 2부에서 공개돼요</p>
+            <em id="homeReceivedLikeSummary">0개 받음</em>
+          </div>
+        </div>
+        <div class="my-status-item match" id="homeMatchCard">
+          <span class="my-status-lock">▢</span>
+          <div>
+            <strong>매칭 성공</strong>
+            <p id="homeMatchDetail">서로 호감이 통한 결과는 2부에서 공개돼요</p>
+            <em id="homeMatchSummary">0개 매칭</em>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card" style="padding:16px; margin-bottom:12px;">
+      <h3 style="font-size:14px; margin-bottom:10px;">💘 큐피드 알림</h3>
+      <div id="cupidNotifications" style="color:#ff3c87; font-weight:500; min-height:28px; font-size:15px; max-height:80px; overflow-y:auto;">아직 화살을 받지 않았습니다</div>
+    </div>
+
+    <!-- 참가자 목록 -->
+    <div class="card participant-list-card">
+      <div class="card-header">
+        <span class="icon">👥</span>
+        <h2>참가자 목록</h2>
+      </div>
+      <p class="participant-list-subtitle">마음에 드는 분에게 호감을 보내보세요! <span id="participantTotalCount">(0명)</span></p>
+      <div class="participant-like-status">💚 호감 보내기 <strong id="participantLikeLeft">3/3 남음</strong></div>
+      <div class="participant-search-panel">
+        <input id="noteSearchInput" type="text" placeholder="닉네임으로 검색..." />
+      </div>
+      <div id="participantCountSummary" class="participant-count-summary">0명 / 총 0명</div>
+      <div id="oppositeList" class="participant-list"></div>
+    </div>
+
+    <!-- 대화 소재 추천 -->
+    <div class="card small" style="padding:14px; margin-bottom:8px; max-width:none;">
+      <h3 style="font-size:13px; margin-bottom:10px;">💬 대화 소재 추천</h3>
+      <div id="conversationTopic" style="background:rgba(255,165,0,0.08); border-left:3px solid #ffa500; border-radius:8px; padding:14px 14px; margin-bottom:10px; min-height:48px; color:#fff; font-size:14px; line-height:1.7;">
+        <div style="text-align:center; color:#888; font-size:13px;">💡 버튼을 눌러 대화 소재를 받아보세요</div>
+      </div>
+      <button id="getConversationBtn" style="width:100%; padding:10px; font-size:13px; font-weight:700;">💡 새 소재 추천받기</button>
+    </div>
+
+    <!-- 큐피드의 화살 + 호감도 주기 -->
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+      <div class="card small" style="flex:1; min-width:120px; padding:10px;">
+        <h3 style="font-size:11px; margin-bottom:6px; white-space:nowrap;">💘 큐피드의 화살</h3>
+        <p style="color:#ff9500; font-size:10px; margin:0 0 6px 0;">⚠️ 알림 (2회)</p>
+        <select id="cupidList" style="margin-bottom:6px; padding:6px; font-size:11px;"></select>
+        <button id="cupidBtn" style="padding:6px; font-size:11px;">큐피드 발사</button>
+      </div>
+      <div class="card small" style="flex:1; min-width:120px; padding:10px;">
+        <h3 style="font-size:11px; margin-bottom:4px; white-space:nowrap;">⭐ 호감도 주기</h3>
+        <p style="color:#ffd700; font-size:9px; margin:0 0 6px 0; white-space:nowrap;">이성에게 3회 한정</p>
+        <select id="popularityList" style="margin-bottom:6px; padding:6px; font-size:11px;"></select>
+        <button id="popularityBtn" style="padding:6px; font-size:11px; background:#ffd700; color:#000;">⭐ 호감도 주기</button>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex; flex-direction:column;">
+        <h3 style="text-align:center; font-size:22px; margin-bottom:16px;">🏆 호감도 순위</h3>
+        <div style="flex:1; display:flex; flex-direction:column; gap:12px;">
+          <div style="flex:1; background:rgba(100,181,246,0.2); border-radius:12px; padding:16px; display:flex; flex-direction:column; justify-content:center;">
+            <div style="color:#64b5f6; font-weight:700; font-size:18px; margin-bottom:10px; text-align:center;">👨 남성</div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="color:#ffd700; font-size:18px;">🥇</span>
+                <span style="color:#fff; font-size:24px; font-weight:700;" id="maleRank1">-</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="color:#c0c0c0; font-size:16px;">🥈</span>
+                <span style="color:#fff; font-size:20px; font-weight:600;" id="maleRank2">-</span>
+              </div>
+            </div>
+          </div>
+          <div style="flex:1; background:rgba(244,143,177,0.2); border-radius:12px; padding:16px; display:flex; flex-direction:column; justify-content:center;">
+            <div style="color:#f48fb1; font-weight:700; font-size:18px; margin-bottom:10px; text-align:center;">👩 여성</div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="color:#ffd700; font-size:18px;">🥇</span>
+                <span style="color:#fff; font-size:24px; font-weight:700;" id="femaleRank1">-</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span style="color:#c0c0c0; font-size:16px;">🥈</span>
+                <span style="color:#fff; font-size:20px; font-weight:600;" id="femaleRank2">-</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    <!-- 이미지 게임 -->
+    <div id="imageGameSection" class="hidden" style="margin-bottom:12px; border-radius:16px; overflow:hidden; border:2px solid rgba(251,146,60,0.55); background:linear-gradient(135deg, rgba(120,30,180,0.35) 0%, rgba(239,68,68,0.18) 100%);">
+      <div style="padding:18px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+          <span style="font-size:22px;">🎯</span>
+          <h2 style="margin:0; font-size:18px; font-weight:800; background:linear-gradient(90deg,#fb923c,#ef4444); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">이미지 게임</h2>
+        </div>
+        <div style="text-align:center; padding:8px 0 16px 0;">
+          <div style="font-size:48px; margin-bottom:16px;">❓</div>
+          <div id="imageGameQuestion" style="background:rgba(255,255,255,0.13); border-radius:14px; padding:18px 20px; font-size:18px; font-weight:800; color:#fff; margin-bottom:14px; word-break:keep-all;"></div>
+          <p style="font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:16px;">👆 하나, 둘, 셋! 손가락으로 지목하세요!</p>
+          <button id="imageGamePenaltyBtn" style="width:100%; padding:14px; border-radius:12px; border:none; background:linear-gradient(135deg,#ef4444,#f97316); color:#fff; font-size:15px; font-weight:800; cursor:pointer;">🔥 벌칙 확인하기</button>
+          <div id="imageGamePenalty" style="display:none; margin-top:12px; background:rgba(239,68,68,0.2); border:2px solid rgba(239,68,68,0.5); border-radius:12px; padding:14px; font-size:16px; font-weight:800; color:#fca5a5;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 밸런스 게임 -->
+    <div id="balanceGameSection" class="hidden" style="margin-bottom:12px; border-radius:16px; overflow:hidden; border:2px solid rgba(99,102,241,0.55); background:linear-gradient(135deg, rgba(67,56,202,0.3) 0%, rgba(139,92,246,0.22) 100%);">
+      <div style="padding:18px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px;">
+          <span style="font-size:22px;">⚖️</span>
+          <h2 style="margin:0; font-size:18px; font-weight:800; background:linear-gradient(90deg,#818cf8,#c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">밸런스 게임</h2>
+        </div>
+        <p style="font-size:13px; color:rgba(255,255,255,0.7); text-align:center; margin-bottom:16px;">둘 중 하나를 반드시 선택해야 한다면?</p>
+        <div style="display:flex; gap:10px; align-items:stretch; margin-bottom:8px;">
+          <div style="flex:1; background:rgba(99,102,241,0.35); border:2px solid rgba(99,102,241,0.7); border-radius:14px; padding:16px 12px; text-align:center;">
+            <div style="font-size:11px; color:#a5b4fc; font-weight:800; margin-bottom:8px; letter-spacing:1px;">A</div>
+            <div id="balanceGameA" style="font-size:15px; font-weight:800; color:#fff; word-break:keep-all; line-height:1.4;"></div>
+          </div>
+          <div style="display:flex; align-items:center; font-size:13px; font-weight:800; color:rgba(255,255,255,0.4);">VS</div>
+          <div style="flex:1; background:rgba(168,85,247,0.35); border:2px solid rgba(168,85,247,0.7); border-radius:14px; padding:16px 12px; text-align:center;">
+            <div style="font-size:11px; color:#d8b4fe; font-weight:800; margin-bottom:8px; letter-spacing:1px;">B</div>
+            <div id="balanceGameB" style="font-size:15px; font-weight:800; color:#fff; word-break:keep-all; line-height:1.4;"></div>
+          </div>
+        </div>
+        <p style="font-size:12px; color:rgba(255,255,255,0.5); text-align:center; margin-top:8px;">선택 후 이유를 말해보세요! 💬</p>
+        <div style="background:rgba(255,255,255,0.07); border-left:3px solid rgba(168,85,247,0.8); border-radius:8px; padding:10px 14px; margin-top:12px; font-size:12px; color:rgba(255,255,255,0.8); line-height:1.8;">
+          👉 밸런스게임에서 적은 선택지를 고른 분들은 벌주 진행!<br>
+          의리주로 대신 마셔도 되고, 흑기사·흑장미 찬스 사용도 가능합니다 🍻🌹
+        </div>
+      </div>
+    </div>
+
+    <!-- 시그널 투표 -->
+    <div id="signalVoteSection" class="hidden" style="margin-bottom:12px; border-radius:16px; overflow:hidden; border:2px solid rgba(255,110,180,0.45); background:linear-gradient(135deg, rgba(168,85,247,0.18) 0%, rgba(255,110,180,0.14) 100%);">
+      <div style="padding:18px 18px 0 18px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:4px;">
+          <span style="font-size:22px;">💫</span>
+          <h2 style="margin:0; font-size:18px; font-weight:800; background:linear-gradient(90deg,#ff6eb4,#c084fc); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">썸 레이더</h2>
+          <div id="signalVoteSubmittedBadge" style="display:none; margin-left:auto; background:rgba(16,185,129,0.2); border:1px solid #10b981; color:#10b981; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px;">✓ 완료</div>
+        </div>
+        <!-- 타이머 -->
+        <div id="signalVoteTimerBar" style="display:none; margin-bottom:10px; background:rgba(0,0,0,0.3); border-radius:8px; padding:8px 12px; align-items:center; gap:8px;">
+          <span style="font-size:13px; color:rgba(255,255,255,0.7);">⏱ 투표 마감까지</span>
+          <span id="signalVoteCountdown" style="font-size:16px; font-weight:800; color:#ff6eb4; font-family:monospace;">3:00</span>
+        </div>
+        <p style="margin:0 0 16px 0; font-size:13px; color:rgba(255,255,255,0.65);">1부 파티에서 가장 마음에 남은 분을 골라보세요</p>
+      </div>
+
+      <!-- 투표 패널 -->
+      <div id="signalVotePanel">
+        <!-- Q1 -->
+        <div style="margin:0 14px 12px 14px; background:rgba(0,0,0,0.25); border-radius:12px; padding:14px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+            <span style="font-size:18px;">😄</span>
+            <span style="font-size:14px; font-weight:700; color:#fff;">가장 나를 웃게 한 사람</span>
+            <span id="signalQ1Count" style="margin-left:auto; font-size:12px; color:rgba(255,255,255,0.5);">0/1</span>
+          </div>
+          <div id="signalQ1List" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        </div>
+        <!-- Q2 -->
+        <div style="margin:0 14px 16px 14px; background:rgba(0,0,0,0.25); border-radius:12px; padding:14px;">
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+            <span style="font-size:18px;">💓</span>
+            <span style="font-size:14px; font-weight:700; color:#fff;">가장 나를 설레게 한 사람</span>
+            <span id="signalQ2Count" style="margin-left:auto; font-size:12px; color:rgba(255,255,255,0.5);">0/1</span>
+          </div>
+          <div id="signalQ2List" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+        </div>
+        <div style="padding:0 14px 16px 14px;">
+          <button id="submitSignalVoteBtn" style="width:100%; background:linear-gradient(135deg,#ff6eb4,#c084fc); color:#fff; border:none; padding:14px; border-radius:12px; font-size:15px; font-weight:800; cursor:pointer; letter-spacing:0.5px;">💫 시그널 보내기</button>
+        </div>
+      </div>
+
+      <!-- 결과 공개 패널 (관리자가 공개 시에만 표시) -->
+      <div id="signalResultPanel" style="display:none; padding:0 14px 16px 14px;">
+        <div style="text-align:center; padding:14px 0 8px 0;">
+          <div style="font-size:15px; font-weight:700; color:#fff; margin-bottom:4px;">✨ 썸 레이더 결과</div>
+          <div style="font-size:12px; color:rgba(255,255,255,0.55);">나를 선택해준 사람들을 확인해보세요</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.3); border-radius:12px; padding:14px; margin-bottom:10px;">
+          <div style="font-size:12px; color:#c084fc; font-weight:700; margin-bottom:10px;">😄 나를 웃게 한 사람으로 선택한 분</div>
+          <div id="mySignalLaughResult" style="font-size:14px; color:#fff;"></div>
+        </div>
+        <div style="background:rgba(0,0,0,0.3); border-radius:12px; padding:14px;">
+          <div style="font-size:12px; color:#ff6eb4; font-weight:700; margin-bottom:10px;">💓 나를 설레게 한 사람으로 선택한 분</div>
+          <div id="mySignalHeartResult" style="font-size:14px; color:#fff;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="storySection" class="card hidden">
+      <div class="card-header">
+        <span class="icon">💭</span>
+        <h2>사연 이벤트</h2>
+      </div>
+      <p class="card-subtitle">MC가 참가자분들의 사연을 받아서 인연을 만들 수 있게 도와드립니다</p>
+      <div style="background:rgba(255,255,255,0.05); border-radius:8px; padding:12px; margin-bottom:12px; font-size:13px; line-height:1.6; color:rgba(255,255,255,0.85);">
+        <div style="margin-bottom:6px;">💡 <strong>사연 예시:</strong></div>
+        <div>• 저기 고양이상 매력 있어요 !</div>
+        <div>• 빨간 카디건 입은 분이 멋있어요</div>
+        <div>• 왼쪽 테이블 2번 분이 재미있어요</div>
+        <div style="margin-top:8px; color:rgba(255,255,255,0.7); font-size:12px;">* MC가 사연을 읽으며 분위기를 밝혀드립니다 *</div>
+      </div>
+      <textarea id="storyContent" placeholder="사연을 입력해주세요 (예: 저기 고양이상 맘에 들어요)"></textarea>
+      <button id="sendStoryBtn">사연 전송</button>
+    </div>
+
+    <div class="card hidden" id="finalCard">
+      <div class="card-header">
+        <span class="icon">💝</span>
+        <h2>최종 선택</h2>
+      </div>
+      <p class="card-subtitle">가장 끌리는 이성 두명을 선택하세요.</p>
+      <div style="background:rgba(255,255,255,0.05); border-radius:8px; padding:12px; margin-bottom:12px; font-size:13px; line-height:1.6; color:rgba(255,255,255,0.85);">
+        <div style="margin-bottom:8px;">📍 2부파티 종료 후</div>
+        <div style="margin-bottom:8px;">가장 마음에 든 이성 2명의 닉네임을 최종 선택 합니다 !</div>
+        <div style="margin-top:8px; color:rgba(255,255,255,0.7); font-size:12px;">*서로를 선택한 참여자에게는 서로의 연락처를 썸잇이 공유해 드립니다*</div>
+      </div>
+      <p style="color:rgba(189,189,189,0.8); font-size:12px; margin:0 0 14px 0;">🔒 선택한 결과는 관리자만 알 수 있게 비공개로 진행됩니다</p>
+      <div id="finalListContainer" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;"></div>
+      <p style="color:rgba(189,189,189,0.8); font-size:11px; margin:0 0 14px 0;">💡 <span id="finalCount">0</span>/2명 선택됨</p>
+      <button id="finalPickBtn" disabled style="opacity:0.5;">최종 선택하기</button>
+    </div>
+
+    <div class="card hidden" id="vote3rdSection" style="padding:20px; margin-bottom:12px; background:linear-gradient(135deg, rgba(255,60,135,0.16), rgba(139,92,246,0.12)); border:1px solid rgba(255,60,135,0.35); border-radius:18px;">
+      <h3 style="font-size:17px; margin-bottom:6px; text-align:center; font-weight:900; letter-spacing:-0.02em;">💘 3부 같이 갈래요?</h3>
+
+      <!-- 비용 안내 (항상 표시) -->
+      <div style="display:flex; justify-content:center; gap:12px; margin-bottom:14px; padding:9px 14px; border-radius:10px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.07);">
+        <span style="font-size:12px; font-weight:800; color:rgba(255,255,255,0.75);">🍺 소주·맥주 무제한</span>
+        <span style="font-size:12px; color:rgba(255,255,255,0.3);">|</span>
+        <span style="font-size:12px; font-weight:800; color:rgba(255,255,255,0.75);">남성 15,000원 · 여성 10,000원</span>
+      </div>
+
+      <!-- 문구 -->
+      <div style="display:flex; flex-direction:column; gap:7px; margin-bottom:16px; padding:12px 14px; border-radius:12px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.06);">
+        <div style="font-size:13px; color:rgba(255,255,255,0.82); font-weight:700; line-height:1.45;">💘 진짜 친해지는 시간은 3부에서 시작됩니다</div>
+        <div style="font-size:13px; color:rgba(255,255,255,0.82); font-weight:700; line-height:1.45;">🍻 자리 이동 없이 더 편하게 이어가요</div>
+        <div style="font-size:13px; color:rgba(255,255,255,0.82); font-weight:700; line-height:1.45;">🔥 연락처 교환은 보통 여기서 가장 많이 나옵니다</div>
+      </div>
+
+      <!-- 참여 현황 메시지 -->
+      <div id="vote3rdPhaseMsg" style="text-align:center; margin-bottom:10px; min-height:36px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+        <span style="font-size:13px; font-weight:800; color:rgba(255,255,255,0.7);">현재 <span style="color:#ff8fbd; font-size:17px; font-weight:900;">0</span>명 참여 확정 — 12명 모이면 3부 진행!</span>
+      </div>
+
+      <!-- 진행 게이지 -->
+      <div style="margin-bottom:16px;">
+        <div style="height:8px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; margin-bottom:5px;">
+          <div id="vote3rdBar" style="height:100%; border-radius:99px; background:linear-gradient(90deg,#ff3c87,#8b5cf6); width:0%; transition:width 0.5s ease;"></div>
+        </div>
+        <div style="text-align:right; font-size:11px; font-weight:800; color:rgba(255,255,255,0.4);" id="vote3rdProgressLabel">0 / 12</div>
+      </div>
+
+      <!-- 버튼 -->
+      <button id="vote3rdYes" style="width:100%; padding:16px; border-radius:12px; border:2px solid rgba(255,60,135,0.4); background:rgba(255,60,135,0.12); color:#ff8fbd; font-size:16px; font-weight:900; cursor:pointer; transition:all 0.25s; margin-bottom:10px;">참여할게요 ✅</button>
+      <div id="vote3rdMyStatus" style="text-align:center; font-size:13px; color:rgba(255,255,255,0.55); font-weight:800;"></div>
+    </div>
+
+    <div style="display:flex; gap:12px; flex-wrap:wrap;">
+      <div class="card small" style="flex:1; min-width:150px;">
+        <h3>🎵 노래 요청</h3>
+        <input id="songTitle" placeholder="노래 제목" style="margin-bottom:6px; padding:8px; font-size:12px;" />
+        <input id="songArtist" placeholder="가수" style="margin-bottom:6px; padding:8px; font-size:12px;" />
+        <button id="songBtn" style="padding:8px; font-size:12px;">요청</button>
+      </div>
+      <div class="card small" style="flex:1; min-width:150px;">
+        <h3>🆘 SOS 요청</h3>
+        <input id="sosReason" placeholder="사유 입력" style="margin-bottom:6px; padding:8px; font-size:12px;" />
+        <button id="sosBtn" style="padding:8px; font-size:12px;">SOS 보내기</button>
+      </div>
+    </div>
+    <div class="card small" style="margin-top:12px; max-width:none;">
+      <button id="leaveBtn" style="width:100%; padding:12px; font-size:13px; background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid rgba(239,68,68,0.4); border-radius:8px; font-weight:700; letter-spacing:0.5px;">🚪 파티 나가기</button>
+    </div>
+  </section>
+
+  <hr/>
+
+  <section id="adminLogin" class="card">
+    <a href="#/" id="adminBackToEntryBtn" style="display:inline-flex; align-items:center; gap:6px; margin-bottom:14px; color:rgba(255,255,255,0.55); font-size:13px; font-weight:700; text-decoration:none;">← 입장화면으로</a>
+    <form id="adminLoginForm" onsubmit="return false;">
+      <h2>관리자 로그인</h2>
+      <input id="adminFloor" type="hidden" value="floor2" />
+      <input type="text" name="username" value="admin" autocomplete="username" style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" tabindex="-1" aria-hidden="true" />
+      <input id="adminPw" type="password" placeholder="비밀번호" autocomplete="current-password" />
+      <button id="adminLoginBtn" type="button">로그인</button>
+    </form>
+  </section>
+
+  <section id="adminPanel" class="hidden card">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+      <h2 style="margin:0;">관리자 패널</h2>
+      <a href="#/" id="adminPanelBackBtn" style="display:inline-flex; align-items:center; gap:5px; padding:7px 13px; border-radius:10px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7); font-size:12px; font-weight:800; text-decoration:none; white-space:nowrap;">← 입장화면</a>
+    </div>
+    <div class="admin-tabs" role="tablist" aria-label="관리자 기능 메뉴">
+      <button type="button" class="active" data-admin-tab="overview">운영</button>
+      <button type="button" data-admin-tab="games">게임</button>
+      <button type="button" data-admin-tab="seating">자리</button>
+      <button type="button" data-admin-tab="requests">요청</button>
+      <button type="button" data-admin-tab="participants">참가자</button>
+      <button type="button" data-admin-tab="matching">매칭</button>
+    </div>
+
+    <div class="admin-page active" data-admin-page="overview">
+      <div class="admin-panel-card pin">
+        <div class="admin-card-label">🔑 오늘의 입장 PIN 번호</div>
+        <div id="adminDailyPin">----</div>
+        <div id="adminPinDate"></div>
+        <button id="regenPinBtn">🔄 PIN 재발급</button>
+      </div>
+
+      <div class="admin-panel-card party">
+        <h3>🎊 2부 파티</h3>
+        <div id="party2AdminStatus">⏸ 2부 시작 전</div>
+        <div class="admin-button-row">
+          <button id="startParty2Btn">🎊 2부 시작</button>
+          <button id="endParty2Btn" class="secondary-danger">⏹ 2부 종료</button>
+        </div>
+      </div>
+
+      <div class="admin-panel-card timer">
+        <h3>⏱️ 라운드 타이머</h3>
+        <div class="admin-timer-row">
+          <input id="timerMinutes" type="number" min="1" max="60" value="13" />
+          <span>분</span>
+          <button id="startTimerBtn">▶️ 시작</button>
+          <button id="stopTimerBtn" class="secondary">⏹️ 중지</button>
+        </div>
+        <div id="adminTimerStatus">타이머 대기중</div>
+      </div>
+
+      <div class="admin-danger-zone">
+        <button id="clearAllBtn">모든 기록 삭제</button>
+        <button id="removeAllParticipantsBtn">모든 참가자 퇴장</button>
+      </div>
+    </div>
+
+    <div class="admin-page" data-admin-page="games">
+      <div class="admin-panel-card games">
+        <h3>🎮 게임 진행</h3>
+        <div class="admin-game-box">
+          <div>
+            <strong>🎯 이미지 게임</strong>
+            <p id="imageGameAdminStatus">1번째 문제</p>
+          </div>
+          <button id="nextImageQuestionBtn">⏭️ 다음 문제</button>
+        </div>
+        <div class="admin-game-box">
+          <div>
+            <strong>⚖️ 밸런스 게임</strong>
+            <p id="balanceGameAdminStatus">1번째 문제</p>
+          </div>
+          <button id="nextBalanceQuestionBtn">⏭️ 다음 문제</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-page" data-admin-page="seating">
+      <div class="admin-panel-card seating">
+        <h3>🪑 남자 로테이션</h3>
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px; padding:10px 14px; background:rgba(255,193,7,0.1); border:1px solid rgba(255,193,7,0.3); border-radius:10px;">
+          <label style="font-size:13px; font-weight:700; color:#ffd700; white-space:nowrap;">마지막 테이블</label>
+          <input id="lastTableInput" type="number" min="1" max="14" placeholder="예: 10" style="width:70px; padding:7px 10px; font-size:15px; font-weight:800; text-align:center; background:#1a1a2e; border:1px solid rgba(255,193,7,0.5); border-radius:8px; color:#fff;" />
+          <button id="saveLastTableBtn" style="width:auto; padding:7px 14px; font-size:13px; font-weight:700; background:#ffc107; color:#1a1a2e; border-radius:8px; white-space:nowrap;">저장</button>
+          <span id="lastTableSavedMsg" style="font-size:12px; color:#10b981; display:none;">✅ 저장됨</span>
+        </div>
+        <p style="font-size:11px; color:rgba(255,255,255,0.45); margin:-6px 0 12px 0;">랩어라운드 기준: 마지막 테이블 → 1번으로 이동</p>
+        <button id="computeRotationBtn">▶️ 남자 한 칸 이동</button>
+        <div id="rotationMoveStatus"></div>
+      </div>
+
+      <div class="admin-panel-card map">
+        <h3>🗺️ 테이블 배치도</h3>
+        <div class="admin-help-text"><span style="color:#64b5f6;">● 남</span> &nbsp; <span style="color:#f48fb1;">● 여</span> &nbsp; <span style="color:#f59e0b;">미</span> = 2부 미참석</div>
+        <div id="adminTableMap"></div>
+      </div>
+    </div>
+
+    <div class="admin-page" data-admin-page="requests">
+      <div class="admin-panel-card vote3rd">
+        <h3>🍺 3부 참여 현황</h3>
+        <div class="admin-stat-grid">
+          <div>
+            <strong id="adminVote3rdFemale">0</strong>
+            <span>👩 여성</span>
+          </div>
+          <div>
+            <strong id="adminVote3rdMale">0</strong>
+            <span>👨 남성</span>
+          </div>
+          <div>
+            <strong id="adminVote3rdTotal">0</strong>
+            <span>🔥 합계</span>
+          </div>
+        </div>
+        <div style="display:flex; gap:8px; margin:10px 0;">
+          <button id="seedFemaleBtn" class="secondary" style="flex:1; font-size:13px; padding:9px 4px;">+1 여성</button>
+          <button id="seedMaleBtn" class="secondary" style="flex:1; font-size:13px; padding:9px 4px;">+1 남성</button>
+        </div>
+        <p class="admin-help-text" id="adminVote3rdSeedInfo">시딩: 여성 0 · 남성 0</p>
+        <div id="adminVote3rdList" class="admin-scroll-box"></div>
+        <button id="resetVote3rdBtn" class="secondary">🗑️ 투표 초기화</button>
+      </div>
+
+      <div class="admin-list-section">
+        <h3>SOS <button onclick="deleteAllFromCollection('sos', 'SOS')">삭제</button></h3>
+        <div id="adminSOS"></div>
+      </div>
+      <div class="admin-list-section">
+        <h3>노래 요청 <button onclick="deleteAllFromCollection('songs', '노래요청')">삭제</button></h3>
+        <div id="adminSongs"></div>
+      </div>
+      <div class="admin-list-section">
+        <h3>💭 사연 이벤트 <button onclick="deleteAllFromCollection('stories', '사연')">삭제</button></h3>
+        <a href="story-display.html" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-bottom:12px;padding:12px;border-radius:12px;background:linear-gradient(135deg,rgba(255,60,135,0.18),rgba(139,92,246,0.14));border:1px solid rgba(255,60,135,0.35);color:#ff8fbd;font-size:14px;font-weight:900;text-decoration:none;">🖥️ 빔프로젝터 화면 열기</a>
+        <div id="adminStories"></div>
+      </div>
+    </div>
+
+    <div class="admin-page" data-admin-page="participants">
+      <h3>👥 현재 참가자 <span id="participantCount">(0명)</span></h3>
+      <div id="genderCount" class="admin-gender-count">
+        <span>🙋‍♂️ 남 <b id="maleCount">0</b>명</span>
+        <span>🙋‍♀️ 여 <b id="femaleCount">0</b>명</span>
+      </div>
+      <div id="adminParticipants"></div>
+    </div>
+
+    <div class="admin-page" data-admin-page="matching">
+      <div class="admin-list-section">
+        <h3>💝 커플탄생</h3>
+        <div id="adminCouples"></div>
+      </div>
+      <div class="admin-list-section">
+        <h3>📱 커플 연락처</h3>
+        <div id="adminCoupleContacts"></div>
+      </div>
+      <div class="admin-list-section" style="padding:0; background:none; border:none;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding:0 2px;">
+          <h3 style="margin:0;">💚 호감도 현황</h3>
+          <button onclick="deleteAllFromCollection('popularity', '호감도')" style="width:auto; padding:6px 12px; font-size:11px; background:rgba(239,68,68,0.15); color:#fca5a5; border:1px solid rgba(239,68,68,0.3); border-radius:8px;">삭제</button>
+        </div>
+        <div id="adminPopularity"></div>
+      </div>
+      <div class="admin-list-section">
+        <h3>최종선택 집계 <button onclick="deleteAllFromCollection('final', '최종선택')">삭제</button></h3>
+        <div id="adminFinal"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="firebase-config.js"></script>
+<script type="module" src="router.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
