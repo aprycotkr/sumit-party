@@ -223,6 +223,12 @@ let realName = "";
 let isSecondPartActive = false;
 let activeLikeStatusTab = 'final';
 let timerAlertShown = false;
+let _timerEndTime = 0;
+let _timerIsActive = false;
+let _timerUnsub = null;
+let _adminTimerEndTime = 0;
+let _adminTimerIsActive = false;
+let _adminTimerUnsub = null;
 let lastSosCount = -1;
 let lastSongCount = -1;
 let adminFirstLoad = true;
@@ -355,6 +361,7 @@ function setMyInfo() {
   listenImageGame();
   listenBalanceGame();
   listenParty2();
+  listenTimer();
 
   // 모바일 백그라운드 복귀 시 게임 상태 재조회 (한 번만 등록)
   if(!window._gameVisibilityRegistered) {
@@ -499,8 +506,26 @@ enterBtn.addEventListener('click', async () => {
       // groupKey = 자기 테이블 번호 (늦게 합류한 남성도 자기 테이블 그룹으로 배정)
       const groupKey = tableNumber ? String(tableNumber) : null;
       myGroupKey = groupKey;
+
+      // 늦게 합류한 남성: 같은 groupKey의 현재 위치로 동기화
+      let initialCurrentTable = tableNumber;
+      if(gender === 'male' && groupKey) {
+        try {
+          const groupSnap = await getDocs(query(
+            collection(db, 'participants'),
+            where('groupKey', '==', groupKey),
+            where('gender', '==', 'male'),
+            where('floor', '==', floor)
+          ));
+          groupSnap.forEach(d => {
+            const ct = d.data().currentTable;
+            if(ct) initialCurrentTable = ct;
+          });
+        } catch(e) { /* fallback to tableNumber */ }
+      }
+
       const joinedTs = Date.now();
-      const docRef = await addDoc(collection(db, 'participants'), {nickname, gender, floor, tableNumber, currentTable: gender === 'male' ? tableNumber : null, groupKey, isStaff, secondParty, realName, age, phoneNumber, cupidCount:2, finalCompleted:false, joined:joinedTs, updated: joinedTs});
+      const docRef = await addDoc(collection(db, 'participants'), {nickname, gender, floor, tableNumber, currentTable: gender === 'male' ? initialCurrentTable : null, groupKey, isStaff, secondParty, realName, age, phoneNumber, cupidCount:2, finalCompleted:false, joined:joinedTs, updated: joinedTs});
       participantDocId = docRef.id;
 
       // 레이스 컨디션 방어: 동시 입장으로 동일 닉네임 문서가 2개 생성됐을 경우 오래된 것 삭제
@@ -1651,6 +1676,7 @@ function loadAdminRealtime() {
   listenAdminVote3rd();
   listenGamesAdmin();
   listenParty2Admin();
+  listenAdminTimer();
 
   if(adminParticipantsUnsub) { adminParticipantsUnsub(); adminParticipantsUnsub = null; }
 
@@ -2233,80 +2259,42 @@ function listenCupidArrows() {
 }
 
 // 타이머 기능 (층별 분리)
-let timerFirstLoad = true; // 처음 로드 시 팝업 방지
-let lastRemaining = -1; // 이전 남은 시간 추적
+let timerFirstLoad = true;
+let lastRemaining = -1;
 
+// listenTimer: onSnapshot을 한 번만 등록하고 endTime을 변수에 저장
+// setInterval에서 저장된 endTime으로 화면 업데이트 (매 초 새 리스너 생성 방지)
 function listenTimer() {
   if(!floor) return;
+  if(_timerUnsub) { _timerUnsub(); _timerUnsub = null; }
   const timerDocId = 'timer_' + floor;
   timerFirstLoad = true;
   lastRemaining = -1;
-  
-  onSnapshot(doc(db, 'settings', timerDocId), (docSnap) => {
-    if(!docSnap.exists()) {
-      timerDisplay.classList.add('hidden');
-      timerFirstLoad = false;
-      return;
-    }
-    const data = docSnap.data();
-    if(!data.active) {
+
+  _timerUnsub = onSnapshot(doc(db, 'settings', timerDocId), (docSnap) => {
+    if(!docSnap.exists() || !docSnap.data().active) {
+      _timerIsActive = false;
+      _timerEndTime = 0;
       timerDisplay.classList.add('hidden');
       timerAlertShown = false;
       timerFirstLoad = false;
       lastRemaining = -1;
       return;
     }
-    
+    const data = docSnap.data();
+    _timerEndTime = data.endTime;
+    _timerIsActive = true;
     timerDisplay.classList.remove('hidden');
-    const endTime = data.endTime;
-    const now = Date.now();
-    const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
-    
-    // 처음 로드 시에는 팝업 표시하지 않음 (이미 종료된 타이머인 경우)
+    const remaining = Math.max(0, Math.floor((_timerEndTime - Date.now()) / 1000));
     if(timerFirstLoad) {
       timerFirstLoad = false;
       lastRemaining = remaining;
       if(remaining <= 0) {
-        timerAlertShown = true; // 이미 종료된 상태면 팝업 표시 안함
+        timerAlertShown = true;
         timerText.textContent = '00:00';
         timerText.style.color = '#ff6464';
-      } else {
-        const mins = Math.floor(remaining / 60);
-        const secs = remaining % 60;
-        timerText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        timerText.style.color = remaining <= 60 ? '#ff6464' : '#fff';
       }
-      return;
     }
-    
-    // 타이머가 진행 중에서 종료로 변할 때만 팝업 표시
-    if(remaining <= 0 && lastRemaining > 0 && !timerAlertShown) {
-      timerAlertShown = true;
-      timerText.textContent = '00:00';
-      timerText.style.color = '#ff6464';
-      
-      if(navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
-      
-      try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdnd3eHlzb2tnaWxucHJycnBua2hoampqampra2tsbGxsbGxsbGxsbGtra2tra2pqamlpaWhoaGdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnaGhoaWlpamlqamtrbGxtbW1tbW1tbGtra2ppaWhoZ2dnZmZmZWVlZGRkY2NjYmJiYmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWBgYGBgYGBgYGBgYGBgYGBgYGBgYF9fX19fX19fX19fX19fX19fXw==');
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
-      } catch(e) {}
-      
-      let msg = '🔔 현재 라운드가 종료되었습니다!';
-      if(gender === 'male') {
-        msg += '\n\n👨 남성 참가자분들은 다음 테이블로 이동해주세요!';
-      }
-      alert(msg);
-    } else if(remaining > 0) {
-      timerAlertShown = false;
-      const mins = Math.floor(remaining / 60);
-      const secs = remaining % 60;
-      timerText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-      timerText.style.color = remaining <= 60 ? '#ff6464' : '#fff';
-    }
-    
-    lastRemaining = remaining;
   });
 }
 
@@ -2339,35 +2327,61 @@ stopTimerBtn?.addEventListener('click', async () => {
   }
 });
 
-// 관리자 타이머 상태 (층별)
+// 관리자 타이머 상태 (층별) — onSnapshot 한 번만 등록, endTime 변수에 저장
 function listenAdminTimer() {
   if(!adminFloor) return;
+  if(_adminTimerUnsub) { _adminTimerUnsub(); _adminTimerUnsub = null; }
   const timerDocId = 'timer_' + adminFloor;
-  onSnapshot(doc(db, 'settings', timerDocId), (docSnap) => {
+  _adminTimerUnsub = onSnapshot(doc(db, 'settings', timerDocId), (docSnap) => {
     if(!docSnap.exists() || !docSnap.data().active) {
+      _adminTimerIsActive = false;
+      _adminTimerEndTime = 0;
       if(adminTimerStatus) adminTimerStatus.textContent = '타이머 대기중';
       return;
     }
     const data = docSnap.data();
-    const remaining = Math.max(0, Math.floor((data.endTime - Date.now()) / 1000));
-    const mins = Math.floor(remaining / 60);
-    const secs = remaining % 60;
-    if(adminTimerStatus) {
-      const floorName = getFloorText(adminFloor);
-      adminTimerStatus.textContent = `⏱️ ${floorName} 남은시간: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-      adminTimerStatus.style.color = remaining <= 60 ? '#ff6464' : '#4ade80';
-    }
+    _adminTimerEndTime = data.endTime;
+    _adminTimerIsActive = true;
   });
 }
 
-// 타이머 1초마다 업데이트
+// 타이머 화면 1초마다 업데이트 (Firebase 재호출 없이 저장된 endTime 사용)
 setInterval(() => {
-  if(timerDisplay && floor) listenTimer();
-  if(adminTimerStatus && adminFloor && adminPanel && !adminPanel.classList.contains('hidden')) listenAdminTimer();
-}, 1000);
+  if(_timerIsActive && _timerEndTime) {
+    const remaining = Math.max(0, Math.floor((_timerEndTime - Date.now()) / 1000));
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    timerText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    timerText.style.color = remaining <= 60 ? '#ff6464' : '#fff';
 
-listenTimer();
-listenAdminTimer();
+    if(remaining <= 0 && lastRemaining > 0 && !timerAlertShown) {
+      timerAlertShown = true;
+      timerText.textContent = '00:00';
+      timerText.style.color = '#ff6464';
+      if(navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
+      try {
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdnd3eHlzb2tnaWxucHJycnBua2hoampqampra2tsbGxsbGxsbGxsbGtra2tra2pqamlpaWhoaGdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnaGhoaWlpamlqamtrbGxtbW1tbW1tbGtra2ppaWhoZ2dnZmZmZWVlZGRkY2NjYmJiYmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWBgYGBgYGBgYGBgYGBgYGBgYGBgYF9fX19fX19fX19fX19fX19fXw==');
+        audio.volume = 0.5;
+        audio.play().catch(() => {});
+      } catch(e) {}
+      let msg = '🔔 현재 라운드가 종료되었습니다!';
+      if(gender === 'male') msg += '\n\n👨 남성 참가자분들은 다음 테이블로 이동해주세요!';
+      alert(msg);
+    } else if(remaining > 0) {
+      timerAlertShown = false;
+    }
+    lastRemaining = remaining;
+  }
+
+  if(_adminTimerIsActive && _adminTimerEndTime && adminTimerStatus && adminFloor && adminPanel && !adminPanel.classList.contains('hidden')) {
+    const remaining = Math.max(0, Math.floor((_adminTimerEndTime - Date.now()) / 1000));
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    const floorName = getFloorText(adminFloor);
+    adminTimerStatus.textContent = `⏱️ ${floorName} 남은시간: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    adminTimerStatus.style.color = remaining <= 60 ? '#ff6464' : '#4ade80';
+  }
+}, 1000);
 
 
 // 2부 파티 상태 리스너 (참가자용)
@@ -3004,7 +3018,7 @@ async function computeTableRotation() {
   const assignments = {};
   males.forEach(m => {
     const currentTable = getParticipantCurrentTableValue(m);
-    assignments[m.id] = currentTable === lastTable ? 1 : currentTable + 1;
+    assignments[m.id] = currentTable >= lastTable ? 1 : currentTable + 1;
   });
 
   const batch = writeBatch(db);
@@ -3018,6 +3032,7 @@ async function computeTableRotation() {
     round: newRound,
     active: false,
     lastTable,
+    manualLastTable: manualLastTable || lastTable,
     movedCount: males.length,
     assignments,
     updatedAt: Date.now(),
