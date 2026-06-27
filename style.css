@@ -236,6 +236,10 @@ details.edit-settings-card[open]>summary::after{transform:rotate(90deg)}
 details.edit-settings-card>.edit-settings-body{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08)}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,100,100,.7)}70%{box-shadow:0 0 0 10px rgba(255,100,100,0)}100%{box-shadow:0 0 0 0 rgba(255,100,100,0)}}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes timerPulse{0%,100%{border-color:#ff3c87;box-shadow:0 0 10px rgba(255,60,135,0.3)}50%{border-color:#ff6464;box-shadow:0 0 30px rgba(255,100,100,0.7),0 0 60px rgba(255,60,135,0.3)}}
+#timerDisplay.round-ending{animation:timerPulse 1s ease-in-out infinite}
+@keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+#_sumit_toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);padding:12px 22px;border-radius:24px;font-size:14px;font-weight:700;z-index:9999;pointer-events:none;backdrop-filter:blur(10px);white-space:nowrap;animation:toastIn .25s ease-out}
 @media screen and (min-width:560px){body{padding-bottom:calc(86px + env(safe-area-inset-bottom))}.bottom-tabbar{border-radius:24px 24px 0 0}.action-grid{grid-template-columns:1fr 1fr}.action-grid .action-card:first-child{grid-column:1/-1}}
 @media screen and (max-width:480px){body{padding:10px;padding-bottom:calc(88px + env(safe-area-inset-bottom))}.wrap{max-width:100%}#entry{padding:16px 14px 20px;border-radius:22px}.entry-form{padding:16px}.card{padding:12px;border-radius:16px;margin-bottom:10px}.card.small{padding:10px}h1{font-size:24px}h2{font-size:17px}h3{font-size:15px}.page-header h1{font-size:26px}.card-header h2{font-size:17px}.card-header .icon{font-size:21px}input,select,textarea,button{padding:12px;font-size:16px}.inline>div{min-width:100%}.admin-entry-link{right:12px;top:calc(10px + env(safe-area-inset-top))}}
 #vote3rdNo:hover{border-color:rgba(139,92,246,0.5)!important;box-shadow:0 0 14px rgba(139,92,246,0.2);color:rgba(255,255,255,0.8)!important}

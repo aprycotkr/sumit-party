@@ -72,6 +72,24 @@ function escapeHtml(value) {
   }[char]));
 }
 
+function showToast(msg, color = '#10b981', duration = 3000) {
+  let toast = document.getElementById('_sumit_toast');
+  if(!toast) {
+    toast = document.createElement('div');
+    toast.id = '_sumit_toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.background = color === '#10b981'
+    ? 'linear-gradient(135deg,rgba(16,185,129,0.92),rgba(16,185,129,0.75))'
+    : `linear-gradient(135deg,${color}ee,${color}bb)`;
+  toast.style.color = '#fff';
+  toast.style.border = `1px solid ${color}88`;
+  toast.style.display = 'block';
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { toast.style.display = 'none'; }, duration);
+}
+
 function getParticipantDisplayName(p) {
   const nicknameValue = String(p?.nickname || '').trim();
   const realNameValue = String(p?.realName || '').trim();
@@ -229,6 +247,8 @@ let _timerUnsub = null;
 let _adminTimerEndTime = 0;
 let _adminTimerIsActive = false;
 let _adminTimerUnsub = null;
+let _adminTimerAutoRotateDone = false;
+let lastReceivedPopularityCount = -1;
 let lastSosCount = -1;
 let lastSongCount = -1;
 let adminFirstLoad = true;
@@ -579,6 +599,11 @@ function listenMyStats() {
   // 받은 호감도 실시간 감지
   const popularityQ = query(collection(db, 'popularity'), where('toId','==',participantDocId));
   onSnapshot(popularityQ, snap => {
+    if(lastReceivedPopularityCount !== -1 && snap.size > lastReceivedPopularityCount) {
+      if(navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      showToast('💚 누군가 호감을 보냈습니다!', '#10b981');
+    }
+    lastReceivedPopularityCount = snap.size;
     if(myPopularityEl) myPopularityEl.textContent = snap.size;
     myReceivedPopularity = [];
     snap.forEach(docSnap => {
@@ -961,7 +986,60 @@ function renderLikeStatusDashboard(nextTab) {
 
 window.renderLikeStatusDashboard = renderLikeStatusDashboard;
 
+function renderCurrentTablePartners() {
+  const card = document.getElementById('currentPartnerCard');
+  const list = document.getElementById('currentPartnerList');
+  if(!card || !list || isStaff) { if(card) card.style.display = 'none'; return; }
+
+  const myTable = Number(myCurrentTable || tableNumber);
+  if(!myTable) { card.style.display = 'none'; return; }
+
+  const partners = allVisibleParticipants.filter(({ data }) =>
+    getParticipantCurrentTableValue(data) === myTable
+  );
+  if(partners.length === 0) { card.style.display = 'none'; return; }
+
+  card.style.display = 'block';
+  list.innerHTML = partners.map(({ id: docId, data }) => {
+    const displayName = getParticipantDisplayName(data);
+    const avatar = escapeHtml(displayName.slice(0, 1));
+    const isMale = data.gender === 'male';
+    const avatarColor = isMale ? 'rgba(100,181,246,0.5)' : 'rgba(244,143,177,0.5)';
+    const detail = isSecondPartActive
+      ? `${data.realName || '이름 미입력'} · ${data.age ? `${data.age}세` : '나이 미입력'}`
+      : '이름/나이는 2부부터 공개';
+    const alreadySent = sentPopularityIds.has(docId);
+    const isDisabled = alreadySent || popularityRemaining <= 0 || docId === participantDocId;
+    const btnStyle = alreadySent
+      ? 'border:2px solid rgba(16,185,129,0.6);background:rgba(16,185,129,0.15);color:#10b981;'
+      : 'border:2px solid rgba(255,110,180,0.6);background:rgba(255,110,180,0.15);color:#ff6eb4;';
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.07);">
+        <div style="width:40px;height:40px;border-radius:50%;background:${avatarColor};display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex-shrink:0;">${avatar}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:15px;color:#fff;">${escapeHtml(displayName)}</div>
+          <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:2px;">${escapeHtml(detail)}</div>
+        </div>
+        <button data-partner-id="${escapeHtml(docId)}" style="padding:8px 14px;border-radius:20px;${btnStyle}font-size:13px;font-weight:700;cursor:${isDisabled?'default':'pointer'};flex-shrink:0;" ${isDisabled?'disabled':''}>
+          ${alreadySent ? '✓ 완료' : '💚 호감'}
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  list.querySelectorAll('[data-partner-id]').forEach(btn => {
+    if(!btn.disabled) {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        await sendPopularityTo(btn.dataset.partnerId);
+        renderCurrentTablePartners();
+      });
+    }
+  });
+}
+
 function renderNotesList(filterText) {
+  renderCurrentTablePartners();
   const searchInput = document.getElementById('noteSearchInput');
   const participantTotalCount = document.getElementById('participantTotalCount');
   const participantCountSummary = document.getElementById('participantCountSummary');
@@ -2301,6 +2379,7 @@ function listenTimer() {
 // 관리자 타이머 시작 (층별)
 startTimerBtn?.addEventListener('click', async () => {
   if(!adminFloor) { alert('층을 먼저 선택하세요'); return; }
+  _adminTimerAutoRotateDone = false;
   const mins = parseInt(timerMinutes.value) || 13;
   const endTime = Date.now() + mins * 60 * 1000;
   const timerDocId = 'timer_' + adminFloor;
@@ -2317,6 +2396,7 @@ startTimerBtn?.addEventListener('click', async () => {
 // 관리자 타이머 중지 (층별)
 stopTimerBtn?.addEventListener('click', async () => {
   if(!adminFloor) return;
+  _adminTimerAutoRotateDone = false;
   const timerDocId = 'timer_' + adminFloor;
   try {
     await setDoc(doc(db, 'settings', timerDocId), { active: false, endTime: 0 });
@@ -2353,6 +2433,11 @@ setInterval(() => {
     const secs = remaining % 60;
     timerText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
     timerText.style.color = remaining <= 60 ? '#ff6464' : '#fff';
+    const timerDisplay = document.getElementById('timerDisplay');
+    if(timerDisplay) {
+      if(remaining <= 60 && remaining > 0) timerDisplay.classList.add('round-ending');
+      else timerDisplay.classList.remove('round-ending');
+    }
 
     if(remaining <= 0 && lastRemaining > 0 && !timerAlertShown) {
       timerAlertShown = true;
@@ -2373,13 +2458,24 @@ setInterval(() => {
     lastRemaining = remaining;
   }
 
-  if(_adminTimerIsActive && _adminTimerEndTime && adminTimerStatus && adminFloor && adminPanel && !adminPanel.classList.contains('hidden')) {
+  if(_adminTimerIsActive && _adminTimerEndTime && adminFloor) {
     const remaining = Math.max(0, Math.floor((_adminTimerEndTime - Date.now()) / 1000));
-    const mins = Math.floor(remaining / 60);
-    const secs = remaining % 60;
-    const floorName = getFloorText(adminFloor);
-    adminTimerStatus.textContent = `⏱️ ${floorName} 남은시간: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    adminTimerStatus.style.color = remaining <= 60 ? '#ff6464' : '#4ade80';
+    if(adminTimerStatus && adminPanel && !adminPanel.classList.contains('hidden')) {
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      const floorName = getFloorText(adminFloor);
+      adminTimerStatus.textContent = `⏱️ ${floorName} 남은시간: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+      adminTimerStatus.style.color = remaining <= 60 ? '#ff6464' : '#4ade80';
+    }
+    if(remaining <= 0 && !_adminTimerAutoRotateDone) {
+      _adminTimerAutoRotateDone = true;
+      showToast('⏰ 라운드 종료 — 자동 로테이션 중...', '#ffc107');
+      computeTableRotation().then(async () => {
+        try {
+          await setDoc(doc(db, 'settings', 'timer_' + adminFloor), { active: false, endTime: 0 });
+        } catch(e) {}
+      }).catch(() => {});
+    }
   }
 }, 1000);
 
