@@ -27,22 +27,24 @@ let app, db;
 // 층 이름 헬퍼 함수
 function getFloorText(floorValue) {
   switch(floorValue) {
-
-    case 'floor2': return '2층(썸잇)';
+    case 'daegu': return '대구점';
+    case 'busan': return '부산점';
     default: return floorValue;
   }
 }
 
 function getFloorFullName(floorValue) {
   switch(floorValue) {
-    case 'floor2': return '2층 (썸잇)';
+    case 'daegu': return '대구점';
+    case 'busan': return '부산점';
     default: return floorValue;
   }
 }
 
 function getFloorColor(floorValue) {
   switch(floorValue) {
-    case 'floor2': return '#64c8ff';
+    case 'daegu': return '#64c8ff';
+    case 'busan': return '#ff8fbd';
     default: return '#999';
   }
 }
@@ -202,7 +204,7 @@ if(entryPinInput) {
   });
 }
 
-const DAILY_PIN_DOC = 'dailyPin';
+const getDailyPinDoc = (targetFloor) => 'dailyPin_' + targetFloor;
 
 const cupidNotifications = document.getElementById('cupidNotifications');
 const conversationTopic = document.getElementById('conversationTopic');
@@ -241,6 +243,8 @@ let realName = "";
 let isSecondPartActive = false;
 let activeLikeStatusTab = 'final';
 let timerAlertShown = false;
+let matchRevealShown = false;
+let _noteModalResolve = null;
 let _timerEndTime = 0;
 let _timerIsActive = false;
 let _timerUnsub = null;
@@ -249,6 +253,7 @@ let _adminTimerIsActive = false;
 let _adminTimerUnsub = null;
 let _adminTimerAutoRotateDone = false;
 let lastReceivedPopularityCount = -1;
+let lastReceivedNoteCount = -1;
 let lastSosCount = -1;
 let lastSongCount = -1;
 let adminFirstLoad = true;
@@ -389,8 +394,8 @@ function setMyInfo() {
     document.addEventListener('visibilitychange', () => {
       if(document.visibilityState === 'visible') {
         // 화면 복귀 시 getDoc으로 최신 상태 즉시 읽기
-        getDoc(doc(db, 'settings', IMAGE_GAME_DOC)).then(applyImageGameSnap).catch(() => {});
-        getDoc(doc(db, 'settings', BALANCE_GAME_DOC)).then(applyBalanceGameSnap).catch(() => {});
+        getDoc(doc(db, 'settings', getImageGameDoc(floor))).then(applyImageGameSnap).catch(() => {});
+        getDoc(doc(db, 'settings', getBalanceGameDoc(floor))).then(applyBalanceGameSnap).catch(() => {});
       }
     });
   }
@@ -405,16 +410,17 @@ function updateHomeSummary() {
 }
 
 function listenParty2() {
-  const party2Ref = doc(db, 'settings', 'party2');
+  if(!floor) return;
+  const party2Ref = doc(db, 'settings', 'secondPart_' + floor);
   onSnapshot(party2Ref, snap => {
-    const started = snap.exists() && snap.data().started === true;
+    const started = snap.exists() && snap.data().active === true;
     updateSecondPartFeatureVisibility(started);
   });
 }
 
 function updateSecondPartFeatureVisibility(active) {
   isSecondPartActive = active;
-  [storySection, finalCard, vote3rdSection].forEach(section => {
+  [storySection, finalCard].forEach(section => {
     if(active) show(section);
     else hide(section);
   });
@@ -428,7 +434,12 @@ function updateSecondPartFeatureVisibility(active) {
   }
   renderLikeStatusDashboard();
   renderNotesList();
+  renderMyNotes(myReceivedNotes);
   updateTableMaps();
+  if(active && !matchRevealShown) {
+    matchRevealShown = true;
+    showMatchReveal();
+  }
 }
 
 // 2차 참석 선택 UI 없음 — 모든 참가자 기본값 true (2차O)
@@ -441,11 +452,12 @@ enterBtn.addEventListener('click', async () => {
   const age = ageInput ? ageInput.value.trim() : "";
   const phoneNumber = phoneNumberInput ? phoneNumberInput.value.trim() : "";
   gender = genderSelect.value;
-  floor = floorSelect ? floorSelect.value : 'floor2';
+  floor = floorSelect ? floorSelect.value : '';
   secondParty = true;
   const tableVal = tableNumberSelect ? tableNumberSelect.value : '';
   isStaff = tableVal === 'staff';
   tableNumber = isStaff ? null : (parseInt(tableVal) || null);
+  if(!floor) { alert('지점을 선택해 주세요'); return; }
   if(!nickname || !gender) { alert('닉네임과 성별을 입력해 주세요'); return; }
   if(!tableNumber && !isStaff) { alert('테이블 번호를 선택해 주세요'); return; }
 
@@ -454,7 +466,7 @@ enterBtn.addEventListener('click', async () => {
     const enteredPin = entryPinInput ? entryPinInput.value.trim() : '';
     if(!enteredPin) { alert('입장 PIN 번호를 입력해 주세요'); return; }
     try {
-      const pinSnap = await getDoc(doc(db, 'settings', DAILY_PIN_DOC));
+      const pinSnap = await getDoc(doc(db, 'settings', getDailyPinDoc(floor)));
       const today = getTodayStr();
       if(!pinSnap.exists() || pinSnap.data().date !== today) {
         alert('오늘의 PIN 번호가 아직 설정되지 않았습니다. 스탭에게 문의해 주세요.'); return;
@@ -472,7 +484,7 @@ enterBtn.addEventListener('click', async () => {
   enterBtn.textContent = '입장 중...';
 
   try {
-    await cleanupDuplicateParticipantsForFloor(floor);
+    cleanupDuplicateParticipantsForFloor(floor); // fire-and-forget, don't block entry
 
     // 닉네임 + 층으로 중복 체크
     const q = query(collection(db, 'participants'), where('nickname','==',nickname), where('floor','==',floor));
@@ -637,6 +649,28 @@ function listenMyStats() {
     updateMyStatusCards();
     renderLikeStatusDashboard();
     renderNotesList();
+  });
+
+  // 받은 쪽지 실시간 감지
+  const receivedNotesQ = query(collection(db, 'notes'), where('toId','==',participantDocId));
+  onSnapshot(receivedNotesQ, snap => {
+    if(lastReceivedNoteCount !== -1 && snap.size > lastReceivedNoteCount) {
+      if(navigator.vibrate) navigator.vibrate([150, 80, 150]);
+      showToast('💌 누군가 쪽지를 보냈습니다!', '#ff3c87');
+    }
+    lastReceivedNoteCount = snap.size;
+    myReceivedNotes = [];
+    snap.forEach(docSnap => myReceivedNotes.push(docSnap.data()));
+    myReceivedNotes.sort((a, b) => (b.time || 0) - (a.time || 0));
+    renderMyNotes(myReceivedNotes);
+  });
+
+  // 보낸 쪽지 카운트 실시간 감지 (남은 개수 표시)
+  const sentNotesQ = query(collection(db, 'notes'), where('fromId','==',participantDocId));
+  onSnapshot(sentNotesQ, snap => {
+    const remaining = Math.max(0, 5 - snap.size);
+    const el = document.getElementById('participantNoteLeft');
+    if(el) el.textContent = `${remaining}/5 남음`;
   });
 
   const finalQ = query(collection(db, 'final'), where('fromId','==',participantDocId));
@@ -853,6 +887,7 @@ let myCurrentTable = null; // 내 현재 테이블 (로테이션 배정용)
 let sentPopularityIds = new Set();
 let popularityRemaining = 3;
 let myReceivedPopularity = [];
+let myReceivedNotes = [];
 let mySentPopularity = [];
 let myFinalSelections = [];
 
@@ -1112,9 +1147,26 @@ function renderNotesList(filterText) {
       if(!ok && !sentPopularityIds.has(docId)) likeButton.disabled = false;
     });
 
+    const noteButton = document.createElement('button');
+    noteButton.type = 'button';
+    noteButton.className = 'participant-note-btn';
+    noteButton.innerHTML = '💌 쪽지';
+    noteButton.title = '쪽지 보내기';
+    noteButton.disabled = isMe;
+    noteButton.addEventListener('click', async () => {
+      noteButton.disabled = true;
+      await sendNoteTo(docId, data);
+      if(!isMe) noteButton.disabled = false;
+    });
+
+    const actions = document.createElement('div');
+    actions.className = 'participant-actions';
+    actions.appendChild(likeButton);
+    actions.appendChild(noteButton);
+
     card.appendChild(avatar);
     card.appendChild(info);
-    card.appendChild(likeButton);
+    card.appendChild(actions);
     oppositeList.appendChild(card);
   });
 }
@@ -1128,6 +1180,44 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+function renderMyNotes(notes) {
+  const listEl = document.getElementById('noteInboxList');
+  const countEl = document.getElementById('noteInboxCount');
+  if(countEl) countEl.textContent = `(${notes.length}개)`;
+  const homeNotesSummary = document.getElementById('homeNotesSummary');
+  const homeNotesDetail = document.getElementById('homeNotesDetail');
+  if(homeNotesSummary) homeNotesSummary.textContent = `${notes.length}개 받음`;
+  if(homeNotesDetail) homeNotesDetail.textContent = isSecondPartActive ? (notes.length ? '아래 쪽지함에서 확인하세요' : '아직 받은 쪽지가 없어요') : '쪽지 내용은 2부에서 공개돼요';
+  if(!listEl) return;
+  listEl.innerHTML = '';
+
+  if(!isSecondPartActive) {
+    const locked = document.createElement('div');
+    locked.className = 'note-empty';
+    locked.innerHTML = notes.length > 0
+      ? `🔒 쪽지 ${notes.length}개 도착 — 2부 시작 후 공개됩니다`
+      : '아직 받은 쪽지가 없어요';
+    listEl.appendChild(locked);
+    return;
+  }
+
+  if(notes.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'note-empty';
+    empty.textContent = '아직 받은 쪽지가 없어요';
+    listEl.appendChild(empty);
+    return;
+  }
+  notes.forEach(n => {
+    const item = document.createElement('div');
+    item.className = 'note-item';
+    const when = n.time ? new Date(n.time) : null;
+    const timeText = when ? `${String(when.getHours()).padStart(2,'0')}:${String(when.getMinutes()).padStart(2,'0')}` : '';
+    item.innerHTML = `<div class="note-item-head"><strong>💌 ${escapeHtml(n.fromName || '익명')}</strong><span>${timeText}</span></div><p>${escapeHtml(n.text || n.msg || '')}</p>`;
+    listEl.appendChild(item);
+  });
+}
 
 function listenOppositeList() {
   const target = (gender === 'male') ? 'female' : 'male';
@@ -1357,6 +1447,64 @@ cupidBtn.addEventListener('click', async () => {
   }
 });
 
+window.closeNoteModal = closeNoteModal;
+window.submitNoteModal = submitNoteModal;
+function openNoteModal(targetName) {
+  return new Promise(resolve => {
+    _noteModalResolve = resolve;
+    const overlay = document.getElementById('noteModalOverlay');
+    const title = document.getElementById('noteModalTitle');
+    const textarea = document.getElementById('noteModalText');
+    const counter = document.getElementById('noteModalCharCount');
+    if(title) title.textContent = `💌 ${targetName}님에게 쪽지 보내기`;
+    if(textarea) { textarea.value = ''; }
+    if(counter) counter.textContent = '0/200';
+    if(overlay) overlay.classList.remove('hidden');
+    setTimeout(() => textarea && textarea.focus(), 100);
+  });
+}
+function closeNoteModal() {
+  const overlay = document.getElementById('noteModalOverlay');
+  if(overlay) overlay.classList.add('hidden');
+  if(_noteModalResolve) { _noteModalResolve(null); _noteModalResolve = null; }
+}
+function submitNoteModal() {
+  const textarea = document.getElementById('noteModalText');
+  const text = (textarea?.value || '').trim();
+  const overlay = document.getElementById('noteModalOverlay');
+  if(!text) { showToast('쪽지 내용을 입력해주세요 💬'); return; }
+  if(overlay) overlay.classList.add('hidden');
+  if(_noteModalResolve) { _noteModalResolve(text); _noteModalResolve = null; }
+}
+
+async function sendNoteTo(targetId, targetData) {
+  if(!targetId) { alert('대상을 선택하세요'); return false; }
+  if(!participantDocId) { alert('먼저 파티에 입장해주세요'); return false; }
+  if(targetId === participantDocId) { alert('자기 자신에게는 보낼 수 없어요'); return false; }
+  const sentCountSnap = await getDocs(query(collection(db, 'notes'), where('fromId','==',participantDocId), where('floor','==',floor)));
+  if(sentCountSnap.size >= 5) { showToast('쪽지는 총 5개까지만 보낼 수 있어요 💌', '#ff3c87'); return false; }
+  const targetName = getParticipantDisplayName(targetData) || targetData?.nickname || '익명';
+  const text = await openNoteModal(targetName);
+  if(!text) return false;
+  try {
+    await addDoc(collection(db, 'notes'), {
+      fromId: participantDocId,
+      fromName: nickname,
+      toId: targetId,
+      toName: targetData?.nickname || targetName,
+      text,
+      floor,
+      time: Date.now()
+    });
+    showToast('쪽지를 보냈어요! 💌');
+    return true;
+  } catch(err) {
+    console.error('Note error:', err);
+    alert('쪽지 전송 중 오류: ' + err.message);
+    return false;
+  }
+}
+
 async function sendPopularityTo(targetId) {
   if(!targetId) { alert('대상을 선택하세요'); return false; }
   try {
@@ -1567,7 +1715,7 @@ function generateRandomPin() {
 }
 
 async function loadOrCreateDailyPin(forceNew = false) {
-  const pinRef = doc(db, 'settings', DAILY_PIN_DOC);
+  const pinRef = doc(db, 'settings', getDailyPinDoc(adminFloor));
   const snap = await getDoc(pinRef);
   const today = getTodayStr();
 
@@ -1596,21 +1744,15 @@ const endParty2Btn = document.getElementById('endParty2Btn');
 if(startParty2Btn) {
   startParty2Btn.addEventListener('click', async () => {
     if(!confirm('2부 파티를 시작하시겠습니까?\n참가자 화면에 최종선택, 3차투표, 사연이벤트가 표시됩니다.')) return;
-    const currentFloor = adminFloor || (adminFloorSelect ? adminFloorSelect.value : 'floor2') || 'floor2';
-    await Promise.all([
-      setDoc(doc(db, 'settings', 'party2'), { started: true }),
-      setDoc(doc(db, 'settings', 'secondPart_' + currentFloor), { active: true, startedAt: new Date() })
-    ]);
+    const currentFloor = adminFloor || (adminFloorSelect ? adminFloorSelect.value : '') || '';
+    await setDoc(doc(db, 'settings', 'secondPart_' + currentFloor), { active: true, startedAt: new Date() });
   });
 }
 if(endParty2Btn) {
   endParty2Btn.addEventListener('click', async () => {
     if(!confirm('2부 파티를 종료하시겠습니까?\n참가자 화면에서 해당 기능들이 숨겨집니다.')) return;
-    const currentFloor = adminFloor || (adminFloorSelect ? adminFloorSelect.value : 'floor2') || 'floor2';
-    await Promise.all([
-      setDoc(doc(db, 'settings', 'party2'), { started: false }),
-      setDoc(doc(db, 'settings', 'secondPart_' + currentFloor), { active: false })
-    ]);
+    const currentFloor = adminFloor || (adminFloorSelect ? adminFloorSelect.value : '') || '';
+    await setDoc(doc(db, 'settings', 'secondPart_' + currentFloor), { active: false });
   });
 }
 
@@ -1630,7 +1772,8 @@ window.addEventListener('hashchange', () => {
 
 adminLoginBtn.addEventListener('click', async () => {
   const pw = adminPw.value;
-  adminFloor = adminFloorSelect ? adminFloorSelect.value : 'floor2';
+  adminFloor = adminFloorSelect ? adminFloorSelect.value : '';
+  if(!adminFloor) { alert('지점을 선택해 주세요'); return; }
   if(!adminPasswordHash) { alert('관리자 비밀번호 설정이 없습니다'); return; }
   if(await sha256Hex(pw) !== adminPasswordHash) { alert('비밀번호가 틀렸습니다'); return; }
   show(adminPanel);
@@ -1692,13 +1835,12 @@ async function resetFloorState(targetFloor, options = {}) {
   }
 
   await Promise.allSettled([
-    deleteDoc(doc(db, 'settings', TABLE_ROTATION_DOC)),
-    deleteDoc(doc(db, 'settings', SIGNAL_VOTE_DOC)),
+    deleteDoc(doc(db, 'settings', getTableRotationDoc(targetFloor))),
+    deleteDoc(doc(db, 'settings', getSignalVoteDoc(targetFloor))),
     deleteDoc(doc(db, 'settings', 'timer_' + targetFloor)),
-    setDoc(doc(db, 'settings', 'party2'), { started: false }),
     setDoc(doc(db, 'settings', 'secondPart_' + targetFloor), { active: false }),
-    setDoc(doc(db, 'settings', IMAGE_GAME_DOC), { questionIdx: 0 }),
-    setDoc(doc(db, 'settings', BALANCE_GAME_DOC), { questionIdx: 0 })
+    setDoc(doc(db, 'settings', getImageGameDoc(targetFloor)), { questionIdx: 0 }),
+    setDoc(doc(db, 'settings', getBalanceGameDoc(targetFloor)), { questionIdx: 0 })
   ]);
 }
 
@@ -1751,7 +1893,6 @@ function loadAdminRealtime() {
   
   listenTableRotationAdmin();
   listenTableMap(true);
-  listenAdminVote3rd();
   listenGamesAdmin();
   listenParty2Admin();
   listenAdminTimer();
@@ -1786,6 +1927,7 @@ function loadAdminRealtime() {
 
     const count = adminDocs.length;
     if(participantCountEl) participantCountEl.textContent = `(${count}명)`;
+    const qp = document.getElementById('qstatParticipants'); if(qp) qp.textContent = count;
 
     let maleCount = 0, femaleCount = 0;
     adminDocs.forEach(({ data }) => { if(data.gender === 'male') maleCount++; else if(data.gender === 'female') femaleCount++; });
@@ -1871,6 +2013,7 @@ function loadAdminRealtime() {
 
   const sosQ = query(collection(db, 'sos'), where('floor','==',adminFloor));
   onSnapshot(sosQ, snap => {
+    const qs = document.getElementById('qstatSOS'); if(qs) qs.textContent = snap.size;
     adminSOS.innerHTML='';
     const allSOS = [];
     snap.forEach(d => {
@@ -1943,6 +2086,28 @@ function loadAdminRealtime() {
       el.style.borderLeft = '3px solid #87ceeb';
       el.innerHTML = `<div style="font-weight:700; color:#87ceeb; margin-bottom:4px; font-size:15px;">🎵 ${escapeHtml(data.title)}</div><div style="color:#bdbdbd; font-size:14px;">${escapeHtml(data.artist)}</div>`;
       adminSongs.appendChild(el);
+    });
+  });
+
+  const notesQ = query(collection(db, 'notes'), where('floor','==',adminFloor));
+  onSnapshot(notesQ, snap => {
+    const qn = document.getElementById('qstatNotes'); if(qn) qn.textContent = snap.size;
+    const adminNotesEl = document.getElementById('adminNotes');
+    if(!adminNotesEl) return;
+    adminNotesEl.innerHTML = '';
+    if(snap.empty) { adminNotesEl.textContent = '쪽지가 없습니다'; return; }
+    const allNotes = [];
+    snap.forEach(d => allNotes.push(d.data()));
+    allNotes.sort((a, b) => (b.time || 0) - (a.time || 0));
+    allNotes.forEach(data => {
+      const el = document.createElement('div');
+      el.style.padding = '12px';
+      el.style.marginBottom = '8px';
+      el.style.backgroundColor = 'rgba(255,60,135,0.1)';
+      el.style.borderRadius = '8px';
+      el.style.borderLeft = '3px solid #ff3c87';
+      el.innerHTML = `<div style="font-weight:700; color:#ff3c87; font-size:14px;">💌 ${escapeHtml(data.fromName || '익명')} → ${escapeHtml(data.toName || '익명')}</div><div style="color:#bdbdbd; font-size:13px; margin-top:4px; line-height:1.5; white-space:pre-wrap; word-break:break-word;">${escapeHtml(data.text || data.msg || '')}</div>`;
+      adminNotesEl.appendChild(el);
     });
   });
 
@@ -2136,6 +2301,28 @@ function listenAdminVote3rd() {
   });
 }
 
+function showMatchReveal() {
+  const overlay = document.getElementById('matchRevealOverlay');
+  const list = document.getElementById('matchRevealList');
+  if(!overlay || !list) return;
+  list.innerHTML = '';
+
+  const mutualLikes = (myReceivedPopularity || []).filter(item => item.fromId && sentPopularityIds.has(item.fromId));
+  if(mutualLikes.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(255,255,255,.45);font-size:14px;">아직 매칭된 분이 없어요 😢<br>최종 선택에서 기회가 있을 수도 있어요!</div>';
+  } else {
+    mutualLikes.forEach((item, i) => {
+      const card = document.createElement('div');
+      card.className = 'match-reveal-card';
+      const matchName = item.fromName || '상대방';
+      card.innerHTML = `<div style="font-size:28px">💘</div><div><div style="font-weight:900;font-size:15px;color:#fff">${escapeHtml(matchName)}님과 매칭!</div><div style="font-size:13px;color:rgba(255,255,255,.55);margin-top:2px">서로 호감을 보냈어요 💕</div></div>`;
+      list.appendChild(card);
+      setTimeout(() => card.classList.add('visible'), 150 + i * 180);
+    });
+  }
+  overlay.classList.remove('hidden');
+}
+
 function listenAdminPopularity() {
   const adminPopularity = document.getElementById('adminPopularity');
   if(!adminPopularity || !adminFloor) return;
@@ -2143,6 +2330,7 @@ function listenAdminPopularity() {
   const popQ = query(collection(db, 'popularity'), where('floor','==',adminFloor));
   onSnapshot(popQ, async snap => {
     const currentVersion = ++adminPopularityVersion;
+    const ql = document.getElementById('qstatLikes'); if(ql) ql.textContent = snap.size;
 
     if(snap.empty) {
       if(currentVersion === adminPopularityVersion) {
@@ -2353,7 +2541,7 @@ function listenTimer() {
     if(!docSnap.exists() || !docSnap.data().active) {
       _timerIsActive = false;
       _timerEndTime = 0;
-      timerDisplay.classList.add('hidden');
+      timerDisplay?.classList.add('hidden');
       timerAlertShown = false;
       timerFirstLoad = false;
       lastRemaining = -1;
@@ -2362,7 +2550,7 @@ function listenTimer() {
     const data = docSnap.data();
     _timerEndTime = data.endTime;
     _timerIsActive = true;
-    timerDisplay.classList.remove('hidden');
+    timerDisplay?.classList.remove('hidden');
     const remaining = Math.max(0, Math.floor((_timerEndTime - Date.now()) / 1000));
     if(timerFirstLoad) {
       timerFirstLoad = false;
@@ -2435,8 +2623,8 @@ setInterval(() => {
     timerText.style.color = remaining <= 60 ? '#ff6464' : '#fff';
     const timerDisplay = document.getElementById('timerDisplay');
     if(timerDisplay) {
-      if(remaining <= 60 && remaining > 0) timerDisplay.classList.add('round-ending');
-      else timerDisplay.classList.remove('round-ending');
+      if(remaining <= 60 && remaining > 0) timerDisplay?.classList.add('round-ending');
+      else timerDisplay?.classList.remove('round-ending');
     }
 
     if(remaining <= 0 && lastRemaining > 0 && !timerAlertShown) {
@@ -2564,7 +2752,7 @@ function listenSecondPartStatus() {
 // ─────────────────────────────────────────────────────────────
 // 자리 배치 (Table Rotation) — participant side
 // ─────────────────────────────────────────────────────────────
-const TABLE_ROTATION_DOC = 'tableRotation';
+const getTableRotationDoc = (f) => 'tableRotation_' + f;
 const TOTAL_TABLES = 14;
 
 let tableRotationUnsub = null;
@@ -2607,7 +2795,7 @@ function listenTableRotation() {
 
   if(tableRotationUnsub) tableRotationUnsub();
 
-  tableRotationUnsub = onSnapshot(doc(db, 'settings', TABLE_ROTATION_DOC), (snap) => {
+  tableRotationUnsub = onSnapshot(doc(db, 'settings', getTableRotationDoc(floor)), (snap) => {
     if(tableRotationSettleTimer) { clearTimeout(tableRotationSettleTimer); tableRotationSettleTimer = null; }
 
     // 배치 데이터 없음 → 현재 테이블 표시 유지
@@ -2966,7 +3154,8 @@ function listenTableMap(forceReinit = false) {
   if(tableMapParticipantsUnsub) tableMapParticipantsUnsub();
   if(tableMapRotationUnsub) { tableMapRotationUnsub(); tableMapRotationUnsub = null; }
 
-  const participantsQ = query(collection(db, 'participants'), where('floor', '==', 'floor2'));
+  const _mapFloor = adminFloor || floor;
+  const participantsQ = query(collection(db, 'participants'), where('floor', '==', _mapFloor));
   tableMapParticipantsUnsub = onSnapshot(participantsQ, snap => {
     tableMapParticipantsData = [];
     snap.forEach(d => tableMapParticipantsData.push({ id: d.id, ...d.data() }));
@@ -2986,7 +3175,7 @@ let tableRotationAdminUnsub = null;
 function listenTableRotationAdmin() {
   if(tableRotationAdminUnsub) tableRotationAdminUnsub();
 
-  tableRotationAdminUnsub = onSnapshot(doc(db, 'settings', TABLE_ROTATION_DOC), (snap) => {
+  tableRotationAdminUnsub = onSnapshot(doc(db, 'settings', getTableRotationDoc(adminFloor)), (snap) => {
     const moveStatusEl = document.getElementById('rotationMoveStatus');
     const lastTableInput = document.getElementById('lastTableInput');
     if(!snap.exists()) {
@@ -3019,7 +3208,7 @@ function listenTableRotationAdmin() {
         alert(`1 ~ ${TOTAL_TABLES} 사이의 숫자를 입력하세요.`);
         return;
       }
-      await setDoc(doc(db, 'settings', TABLE_ROTATION_DOC), { manualLastTable: val }, { merge: true });
+      await setDoc(doc(db, 'settings', getTableRotationDoc(adminFloor)), { manualLastTable: val }, { merge: true });
       if(lastTableSavedMsg) {
         lastTableSavedMsg.style.display = 'inline';
         setTimeout(() => { lastTableSavedMsg.style.display = 'none'; }, 2000);
@@ -3049,7 +3238,7 @@ async function computeTableRotation() {
   }
 
   try {
-  const settingsRef = doc(db, 'settings', TABLE_ROTATION_DOC);
+  const settingsRef = doc(db, 'settings', getTableRotationDoc(adminFloor));
   const lockStartedAt = Date.now();
   const { currentRound, manualLastTable } = await runTransaction(db, async transaction => {
     const settingsSnap = await transaction.get(settingsRef);
@@ -3064,11 +3253,11 @@ async function computeTableRotation() {
     return { currentRound: existingData.round || 0, manualLastTable: existingData.manualLastTable || null };
   });
 
-  await cleanupDuplicateParticipantsForFloor('floor2');
+  await cleanupDuplicateParticipantsForFloor(adminFloor);
 
   const snap = await getDocs(query(
     collection(db, 'participants'),
-    where('floor', '==', 'floor2')
+    where('floor', '==', adminFloor)
   ));
   const participants = [];
   const seen = {};
@@ -3153,7 +3342,7 @@ async function computeTableRotation() {
 // ─────────────────────────────────────────────────────────────
 // 시그널 투표 (썸 레이더)
 // ─────────────────────────────────────────────────────────────
-const SIGNAL_VOTE_DOC = 'signalVote';
+const getSignalVoteDoc = (f) => 'signalVote_' + f;
 const SIGNAL_DURATION = 180; // 3분
 let signalVoteQ1 = null;
 let signalVoteQ2 = null;
@@ -3271,7 +3460,7 @@ function listenSignalVote() {
   const section = document.getElementById('signalVoteSection');
   if(!section) return;
 
-  signalVoteUnsub = onSnapshot(doc(db, 'settings', SIGNAL_VOTE_DOC), async (snap) => {
+  signalVoteUnsub = onSnapshot(doc(db, 'settings', getSignalVoteDoc(floor)), async (snap) => {
     const votePanel = document.getElementById('signalVotePanel');
     const resultPanel = document.getElementById('signalResultPanel');
     const timerBar = document.getElementById('signalVoteTimerBar');
@@ -3353,22 +3542,22 @@ async function submitSignalVote() {
 // ── 관리자: 시작/결과공개 ──
 async function startSignalVote() {
   const now = Date.now();
-  await setDoc(doc(db, 'settings', SIGNAL_VOTE_DOC), {
+  await setDoc(doc(db, 'settings', getSignalVoteDoc(adminFloor)), {
     active: true, revealed: false, startedAt: now, duration: SIGNAL_DURATION
   });
 }
 
 async function stopSignalVote() {
-  const snap = await getDoc(doc(db, 'settings', SIGNAL_VOTE_DOC));
+  const snap = await getDoc(doc(db, 'settings', getSignalVoteDoc(adminFloor)));
   const base = snap.exists() ? snap.data() : {};
-  await setDoc(doc(db, 'settings', SIGNAL_VOTE_DOC), { ...base, active: false, revealed: false });
+  await setDoc(doc(db, 'settings', getSignalVoteDoc(adminFloor)), { ...base, active: false, revealed: false });
 }
 
 async function resetSignalVote() {
   if(!confirm('썸 레이더 투표 데이터를 전부 초기화하시겠습니까?\n(모든 투표 기록이 삭제됩니다)')) return;
   try {
     // settings 초기화
-    await deleteDoc(doc(db, 'settings', SIGNAL_VOTE_DOC));
+    await deleteDoc(doc(db, 'settings', getSignalVoteDoc(adminFloor)));
     // 이 층 signalVotes 전체 삭제
     const votesSnap = await getDocs(query(
       collection(db, 'signalVotes'),
@@ -3383,9 +3572,9 @@ async function resetSignalVote() {
 }
 
 async function revealSignalVote() {
-  const snap = await getDoc(doc(db, 'settings', SIGNAL_VOTE_DOC));
+  const snap = await getDoc(doc(db, 'settings', getSignalVoteDoc(adminFloor)));
   const base = snap.exists() ? snap.data() : {};
-  await setDoc(doc(db, 'settings', SIGNAL_VOTE_DOC), { ...base, active: false, revealed: true });
+  await setDoc(doc(db, 'settings', getSignalVoteDoc(adminFloor)), { ...base, active: false, revealed: true });
 }
 
 // ── 관리자: 카운트다운 타이머 ──
@@ -3420,7 +3609,7 @@ function listenSignalVoteAdmin() {
   if(resetBtn) resetBtn.onclick = resetSignalVote;
 
   // settings 실시간 반영 + 카운트다운
-  onSnapshot(doc(db, 'settings', SIGNAL_VOTE_DOC), (snap) => {
+  onSnapshot(doc(db, 'settings', getSignalVoteDoc(adminFloor)), (snap) => {
     const statusEl = document.getElementById('signalVoteAdminStatus');
     const cdEl = document.getElementById('signalVoteAdminCountdown');
     if(!snap.exists()) {
@@ -3477,7 +3666,7 @@ function listenSignalVoteAdmin() {
 
 async function resetTableRotation() {
   if(!confirm('자리 배치 데이터를 초기화하시겠습니까?')) return;
-  await deleteDoc(doc(db, 'settings', TABLE_ROTATION_DOC));
+  await deleteDoc(doc(db, 'settings', getTableRotationDoc(adminFloor)));
 
   // 남자 participant 문서에서 currentTable 필드 제거 (참가자 필터 원위치)
   try {
@@ -3498,8 +3687,8 @@ async function resetTableRotation() {
 // ─────────────────────────────────────────────
 // 1부 게임 (이미지 게임 + 밸런스 게임)
 // ─────────────────────────────────────────────
-const IMAGE_GAME_DOC = 'imageGame';
-const BALANCE_GAME_DOC = 'balanceGame';
+const getImageGameDoc = (f) => 'imageGame_' + f;
+const getBalanceGameDoc = (f) => 'balanceGame_' + f;
 
 // ── 날짜 기반 랜덤 시드 셔플 ──────────────────────────────
 function getDailySeed() {
@@ -3621,9 +3810,9 @@ function listenImageGame() {
   const section = document.getElementById('imageGameSection');
   if(!section) return;
   // 즉시 현재 상태 읽기 (네트워크 지연으로 snapshot 늦게 올 경우 대비)
-  getDoc(doc(db, 'settings', IMAGE_GAME_DOC)).then(applyImageGameSnap).catch(() => {});
+  getDoc(doc(db, 'settings', getImageGameDoc(floor))).then(applyImageGameSnap).catch(() => {});
   // 실시간 변경 감지
-  imageGameUnsub = onSnapshot(doc(db, 'settings', IMAGE_GAME_DOC),
+  imageGameUnsub = onSnapshot(doc(db, 'settings', getImageGameDoc(floor)),
     applyImageGameSnap,
     (err) => {
       // 리스너 오류 시 5초 후 재연결
@@ -3657,9 +3846,9 @@ function listenBalanceGame() {
   const section = document.getElementById('balanceGameSection');
   if(!section) return;
   // 즉시 현재 상태 읽기 (네트워크 지연으로 snapshot 늦게 올 경우 대비)
-  getDoc(doc(db, 'settings', BALANCE_GAME_DOC)).then(applyBalanceGameSnap).catch(() => {});
+  getDoc(doc(db, 'settings', getBalanceGameDoc(floor))).then(applyBalanceGameSnap).catch(() => {});
   // 실시간 변경 감지
-  balanceGameUnsub = onSnapshot(doc(db, 'settings', BALANCE_GAME_DOC),
+  balanceGameUnsub = onSnapshot(doc(db, 'settings', getBalanceGameDoc(floor)),
     applyBalanceGameSnap,
     (err) => {
       // 리스너 오류 시 5초 후 재연결
@@ -3671,28 +3860,28 @@ function listenBalanceGame() {
 
 // ── 관리자: 이미지 게임 ──
 async function startImageGame() {
-  await setDoc(doc(db, 'settings', IMAGE_GAME_DOC), { questionIdx: 0 });
+  await setDoc(doc(db, 'settings', getImageGameDoc(adminFloor)), { questionIdx: 0 });
 }
 async function stopImageGame() {
-  await setDoc(doc(db, 'settings', IMAGE_GAME_DOC), { questionIdx: 0 });
+  await setDoc(doc(db, 'settings', getImageGameDoc(adminFloor)), { questionIdx: 0 });
 }
 async function nextImageQuestion() {
-  const snap = await getDoc(doc(db, 'settings', IMAGE_GAME_DOC));
+  const snap = await getDoc(doc(db, 'settings', getImageGameDoc(adminFloor)));
   const cur = snap.exists() ? (snap.data().questionIdx || 0) : 0;
-  await setDoc(doc(db, 'settings', IMAGE_GAME_DOC), { questionIdx: cur + 1 });
+  await setDoc(doc(db, 'settings', getImageGameDoc(adminFloor)), { questionIdx: cur + 1 });
 }
 
 // ── 관리자: 밸런스 게임 ──
 async function startBalanceGame() {
-  await setDoc(doc(db, 'settings', BALANCE_GAME_DOC), { questionIdx: 0 });
+  await setDoc(doc(db, 'settings', getBalanceGameDoc(adminFloor)), { questionIdx: 0 });
 }
 async function stopBalanceGame() {
-  await setDoc(doc(db, 'settings', BALANCE_GAME_DOC), { questionIdx: 0 });
+  await setDoc(doc(db, 'settings', getBalanceGameDoc(adminFloor)), { questionIdx: 0 });
 }
 async function nextBalanceQuestion() {
-  const snap = await getDoc(doc(db, 'settings', BALANCE_GAME_DOC));
+  const snap = await getDoc(doc(db, 'settings', getBalanceGameDoc(adminFloor)));
   const cur = snap.exists() ? (snap.data().questionIdx || 0) : 0;
-  await setDoc(doc(db, 'settings', BALANCE_GAME_DOC), { questionIdx: cur + 1 });
+  await setDoc(doc(db, 'settings', getBalanceGameDoc(adminFloor)), { questionIdx: cur + 1 });
 }
 
 // ── 관리자: 게임 버튼 연결 + 상태 표시 ──
@@ -3711,7 +3900,7 @@ function listenGamesAdmin() {
   if(stopBal) stopBal.style.display = 'none';
   if(nextBal) nextBal.onclick = nextBalanceQuestion;
 
-  onSnapshot(doc(db, 'settings', IMAGE_GAME_DOC), (snap) => {
+  onSnapshot(doc(db, 'settings', getImageGameDoc(adminFloor)), (snap) => {
     const el = document.getElementById('imageGameAdminStatus');
     if(!el) return;
     const idx = snap.exists() ? (snap.data().questionIdx || 0) : 0;
@@ -3720,7 +3909,7 @@ function listenGamesAdmin() {
     el.style.color = '#fb923c';
   });
 
-  onSnapshot(doc(db, 'settings', BALANCE_GAME_DOC), (snap) => {
+  onSnapshot(doc(db, 'settings', getBalanceGameDoc(adminFloor)), (snap) => {
     const el = document.getElementById('balanceGameAdminStatus');
     if(!el) return;
     const idx = snap.exists() ? (snap.data().questionIdx || 0) : 0;
@@ -3732,9 +3921,9 @@ function listenGamesAdmin() {
 
 function listenParty2Admin() {
   const statusEl = document.getElementById('party2AdminStatus');
-  const party2Ref = doc(db, 'settings', 'party2');
+  const party2Ref = doc(db, 'settings', 'secondPart_' + adminFloor);
   onSnapshot(party2Ref, snap => {
-    const started = snap.exists() && snap.data().started === true;
+    const started = snap.exists() && snap.data().active === true;
     if(statusEl) {
       statusEl.textContent = started ? '🎊 2부 진행중' : '⏸ 2부 시작 전';
       statusEl.style.color = started ? '#10b981' : 'rgba(255,255,255,0.6)';

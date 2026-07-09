@@ -92,6 +92,7 @@ function buildHomePartyCard() {
       <div class="home-party-icon">🎉</div>
       <div>
         <span class="home-small-badge" id="homePartyBadge">1부 진행 중</span>
+        <span id="homeTableDisplay" style="font-size:11px;font-weight:700;color:#ffc107;background:rgba(255,193,7,0.15);border:1px solid rgba(255,193,7,0.35);border-radius:6px;padding:2px 8px;margin-left:6px;display:inline-block;">테이블 확인 중</span>
         <h2>파티 시작! 🎉</h2>
       </div>
     </div>
@@ -163,6 +164,7 @@ function buildParticipantShell() {
   const sosCard = closestCard('#sosReason');
   const requestRow = songCard && sosCard && songCard.parentElement === sosCard.parentElement ? songCard.parentElement : null;
   const leaveCard = closestCard('#leaveBtn');
+  const noteInboxCard = closestCard('#noteInboxList');
 
   if (statsCard) statsCard.classList.add('home-stats-card');
   if (leaveCard) leaveCard.classList.add('home-leave-card');
@@ -183,6 +185,7 @@ function buildParticipantShell() {
     legacyLikeControls.style.display = 'none';
     appendIf(likesPage, legacyLikeControls);
   }
+  appendIf(likesPage, noteInboxCard);
 
   appendIf(tablePage, tableMapCard);
 

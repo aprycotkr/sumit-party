@@ -48,10 +48,12 @@
         <option value="14">14번 테이블</option>
         <option value="staff">🎪 스탭 (테이블 없음)</option>
       </select>
-      <input id="floor" type="hidden" value="floor2" />
-      <input id="second_party" type="checkbox" checked style="display:none;" />
-      <input type="hidden" id="secondPartyYes" />
-      <input type="hidden" id="secondPartyNo" />
+      <label>📍 지점 선택</label>
+      <select id="floor" style="margin-bottom:16px;">
+        <option value="">지점을 선택하세요</option>
+        <option value="daegu">대구점</option>
+        <option value="busan">부산점</option>
+      </select>
       <label>🔑 입장 PIN 번호 <span style="font-size:11px; font-weight:500; color:rgba(255,255,255,0.45);">(스탭에게 문의)</span></label>
       <input id="entryPin" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 입력" style="margin-bottom:20px; letter-spacing:6px; font-size:24px; font-weight:800; text-align:center;" maxlength="4" autocomplete="one-time-code" />
       <button id="enterBtn" style="padding:16px; font-size:16px; font-weight:700;">파티 입장하기</button>
@@ -59,11 +61,6 @@
   </section>
 
   <section id="main" class="hidden">
-    <div id="timerDisplay" class="hidden" style="background:linear-gradient(135deg, rgba(255,60,135,0.3), rgba(255,60,135,0.15)); border:3px solid #ff3c87; border-radius:16px; padding:16px; margin-bottom:16px; text-align:center;">
-      <div style="font-size:13px; color:#ff9ebc; margin-bottom:6px; font-weight:600;">⏱️ 현재 라운드 남은 시간</div>
-      <div id="timerText" style="font-size:36px; font-weight:800; color:#fff; font-family:monospace; text-shadow:0 0 20px rgba(255,60,135,0.5);">00:00</div>
-      <div id="partyStatus" style="font-size:14px; font-weight:700; color:#10b981; margin-top:8px;">🎉 1부 진행중</div>
-    </div>
     <div class="card" style="background:linear-gradient(135deg, rgba(168,85,247,0.2), rgba(168,85,247,0.12)); border:2px solid rgba(255,255,255,0.3); margin-bottom:20px;">
       <h2 id="greeting" style="color:#f0f0f0; font-size:1.6em; margin-bottom:8px; text-align:center; font-weight:700; letter-spacing:0.5px;"></h2>
       <div id="teamInfoDisplay" class="hidden second-party-banner">
@@ -145,6 +142,14 @@
             <em id="homeMatchSummary">0개 매칭</em>
           </div>
         </div>
+        <div class="my-status-item" id="homeNotesCard" style="grid-column:1/-1;">
+          <span style="font-size:20px;">💌</span>
+          <div>
+            <strong>받은 쪽지</strong>
+            <p id="homeNotesDetail">쪽지 내용은 2부에서 공개돼요</p>
+            <em id="homeNotesSummary">0개 받음</em>
+          </div>
+        </div>
       </div>
     </div>
     <div class="card" style="padding:16px; margin-bottom:12px;">
@@ -158,8 +163,8 @@
         <span class="icon">👥</span>
         <h2>참가자 목록</h2>
       </div>
-      <p class="participant-list-subtitle">마음에 드는 분에게 호감을 보내보세요! <span id="participantTotalCount">(0명)</span></p>
-      <div class="participant-like-status">💚 호감 보내기 <strong id="participantLikeLeft">3/3 남음</strong></div>
+      <p class="participant-list-subtitle">마음에 드는 분에게 호감 및 쪽지를 보내보세요! <span id="participantTotalCount">(0명)</span></p>
+      <div class="participant-like-status">💚 호감 <strong id="participantLikeLeft">3/3 남음</strong> &nbsp;·&nbsp; 💌 쪽지 <strong id="participantNoteLeft">5/5 남음</strong></div>
       <div class="participant-search-panel">
         <input id="noteSearchInput" type="text" placeholder="닉네임으로 검색..." />
       </div>
@@ -174,6 +179,16 @@
         <div style="text-align:center; color:#888; font-size:13px;">💡 버튼을 눌러 대화 소재를 받아보세요</div>
       </div>
       <button id="getConversationBtn" style="width:100%; padding:10px; font-size:13px; font-weight:700;">💡 새 소재 추천받기</button>
+    </div>
+
+    <!-- 쪽지함 -->
+    <div class="card note-inbox-card">
+      <div class="card-header">
+        <span class="icon">💌</span>
+        <h2>쪽지함 <span id="noteInboxCount" style="font-size:13px; color:#9ca3af; font-weight:700;">(0개)</span></h2>
+      </div>
+      <p class="card-subtitle">참가자 목록에서 마음에 드는 분에게 쪽지를 보내보세요.</p>
+      <div id="noteInboxList" class="note-inbox-list"></div>
     </div>
 
     <!-- 큐피드의 화살 + 호감도 주기 -->
@@ -360,40 +375,6 @@
       <button id="finalPickBtn" disabled style="opacity:0.5;">최종 선택하기</button>
     </div>
 
-    <div class="card hidden" id="vote3rdSection" style="padding:20px; margin-bottom:12px; background:linear-gradient(135deg, rgba(255,60,135,0.16), rgba(139,92,246,0.12)); border:1px solid rgba(255,60,135,0.35); border-radius:18px;">
-      <h3 style="font-size:17px; margin-bottom:6px; text-align:center; font-weight:900; letter-spacing:-0.02em;">💘 3부 같이 갈래요?</h3>
-
-      <!-- 비용 안내 (항상 표시) -->
-      <div style="display:flex; justify-content:center; gap:12px; margin-bottom:14px; padding:9px 14px; border-radius:10px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.07);">
-        <span style="font-size:12px; font-weight:800; color:rgba(255,255,255,0.75);">🍺 소주·맥주 무제한</span>
-        <span style="font-size:12px; color:rgba(255,255,255,0.3);">|</span>
-        <span style="font-size:12px; font-weight:800; color:rgba(255,255,255,0.75);">남성 15,000원 · 여성 10,000원</span>
-      </div>
-
-      <!-- 문구 -->
-      <div style="display:flex; flex-direction:column; gap:7px; margin-bottom:16px; padding:12px 14px; border-radius:12px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.06);">
-        <div style="font-size:13px; color:rgba(255,255,255,0.82); font-weight:700; line-height:1.45;">💘 진짜 친해지는 시간은 3부에서 시작됩니다</div>
-        <div style="font-size:13px; color:rgba(255,255,255,0.82); font-weight:700; line-height:1.45;">🍻 자리 이동 없이 더 편하게 이어가요</div>
-        <div style="font-size:13px; color:rgba(255,255,255,0.82); font-weight:700; line-height:1.45;">🔥 연락처 교환은 보통 여기서 가장 많이 나옵니다</div>
-      </div>
-
-      <!-- 참여 현황 메시지 -->
-      <div id="vote3rdPhaseMsg" style="text-align:center; margin-bottom:10px; min-height:36px; display:flex; flex-direction:column; align-items:center; justify-content:center;">
-        <span style="font-size:13px; font-weight:800; color:rgba(255,255,255,0.7);">현재 <span style="color:#ff8fbd; font-size:17px; font-weight:900;">0</span>명 참여 확정 — 12명 모이면 3부 진행!</span>
-      </div>
-
-      <!-- 진행 게이지 -->
-      <div style="margin-bottom:16px;">
-        <div style="height:8px; border-radius:99px; background:rgba(255,255,255,0.1); overflow:hidden; margin-bottom:5px;">
-          <div id="vote3rdBar" style="height:100%; border-radius:99px; background:linear-gradient(90deg,#ff3c87,#8b5cf6); width:0%; transition:width 0.5s ease;"></div>
-        </div>
-        <div style="text-align:right; font-size:11px; font-weight:800; color:rgba(255,255,255,0.4);" id="vote3rdProgressLabel">0 / 12</div>
-      </div>
-
-      <!-- 버튼 -->
-      <button id="vote3rdYes" style="width:100%; padding:16px; border-radius:12px; border:2px solid rgba(255,60,135,0.4); background:rgba(255,60,135,0.12); color:#ff8fbd; font-size:16px; font-weight:900; cursor:pointer; transition:all 0.25s; margin-bottom:10px;">참여할게요 ✅</button>
-      <div id="vote3rdMyStatus" style="text-align:center; font-size:13px; color:rgba(255,255,255,0.55); font-weight:800;"></div>
-    </div>
 
     <div style="display:flex; gap:12px; flex-wrap:wrap;">
       <div class="card small" style="flex:1; min-width:150px;">
@@ -419,7 +400,11 @@
     <a href="#/" id="adminBackToEntryBtn" style="display:inline-flex; align-items:center; gap:6px; margin-bottom:14px; color:rgba(255,255,255,0.55); font-size:13px; font-weight:700; text-decoration:none;">← 입장화면으로</a>
     <form id="adminLoginForm" onsubmit="return false;">
       <h2>관리자 로그인</h2>
-      <input id="adminFloor" type="hidden" value="floor2" />
+      <select id="adminFloor" style="margin-bottom:12px;">
+        <option value="">지점 선택</option>
+        <option value="daegu">대구점</option>
+        <option value="busan">부산점</option>
+      </select>
       <input type="text" name="username" value="admin" autocomplete="username" style="position:absolute; left:-9999px; width:1px; height:1px; opacity:0;" tabindex="-1" aria-hidden="true" />
       <input id="adminPw" type="password" placeholder="비밀번호" autocomplete="current-password" />
       <button id="adminLoginBtn" type="button">로그인</button>
@@ -430,6 +415,12 @@
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
       <h2 style="margin:0;">관리자 패널</h2>
       <a href="#/" id="adminPanelBackBtn" style="display:inline-flex; align-items:center; gap:5px; padding:7px 13px; border-radius:10px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); color:rgba(255,255,255,0.7); font-size:12px; font-weight:800; text-decoration:none; white-space:nowrap;">← 입장화면</a>
+    </div>
+    <div class="admin-quick-stats" id="adminQuickStats">
+      <div class="admin-quick-stat"><strong id="qstatParticipants">-</strong><span>참가자</span></div>
+      <div class="admin-quick-stat"><strong id="qstatLikes">-</strong><span>호감도</span></div>
+      <div class="admin-quick-stat"><strong id="qstatNotes">-</strong><span>쪽지</span></div>
+      <div class="admin-quick-stat"><strong id="qstatSOS">-</strong><span>SOS</span></div>
     </div>
     <div class="admin-tabs" role="tablist" aria-label="관리자 기능 메뉴">
       <button type="button" class="active" data-admin-tab="overview">운영</button>
@@ -516,30 +507,6 @@
     </div>
 
     <div class="admin-page" data-admin-page="requests">
-      <div class="admin-panel-card vote3rd">
-        <h3>🍺 3부 참여 현황</h3>
-        <div class="admin-stat-grid">
-          <div>
-            <strong id="adminVote3rdFemale">0</strong>
-            <span>👩 여성</span>
-          </div>
-          <div>
-            <strong id="adminVote3rdMale">0</strong>
-            <span>👨 남성</span>
-          </div>
-          <div>
-            <strong id="adminVote3rdTotal">0</strong>
-            <span>🔥 합계</span>
-          </div>
-        </div>
-        <div style="display:flex; gap:8px; margin:10px 0;">
-          <button id="seedFemaleBtn" class="secondary" style="flex:1; font-size:13px; padding:9px 4px;">+1 여성</button>
-          <button id="seedMaleBtn" class="secondary" style="flex:1; font-size:13px; padding:9px 4px;">+1 남성</button>
-        </div>
-        <p class="admin-help-text" id="adminVote3rdSeedInfo">시딩: 여성 0 · 남성 0</p>
-        <div id="adminVote3rdList" class="admin-scroll-box"></div>
-        <button id="resetVote3rdBtn" class="secondary">🗑️ 투표 초기화</button>
-      </div>
 
       <div class="admin-list-section">
         <h3>SOS <button onclick="deleteAllFromCollection('sos', 'SOS')">삭제</button></h3>
@@ -548,6 +515,10 @@
       <div class="admin-list-section">
         <h3>노래 요청 <button onclick="deleteAllFromCollection('songs', '노래요청')">삭제</button></h3>
         <div id="adminSongs"></div>
+      </div>
+      <div class="admin-list-section">
+        <h3>💌 쪽지 <button onclick="deleteAllFromCollection('notes', '쪽지')">삭제</button></h3>
+        <div id="adminNotes"></div>
       </div>
       <div class="admin-list-section">
         <h3>💭 사연 이벤트 <button onclick="deleteAllFromCollection('stories', '사연')">삭제</button></h3>
@@ -588,6 +559,37 @@
     </div>
   </section>
 </main>
+
+<!-- 쪽지 작성 모달 -->
+<div id="noteModalOverlay" class="note-modal-overlay hidden" onclick="if(event.target===this)closeNoteModal()">
+  <div class="note-modal">
+    <div class="note-modal-header">
+      <h3 id="noteModalTitle">💌 쪽지 보내기</h3>
+      <button onclick="closeNoteModal()">×</button>
+    </div>
+    <textarea id="noteModalText" maxlength="200" placeholder="따뜻한 말 한마디를 남겨보세요 💗" oninput="document.getElementById('noteModalCharCount').textContent=this.value.length+'/200'"></textarea>
+    <div class="note-modal-footer">
+      <span class="note-modal-count" id="noteModalCharCount">0/200</span>
+      <div style="display:flex;gap:8px;">
+        <button class="note-modal-btn-cancel" onclick="closeNoteModal()">취소</button>
+        <button class="note-modal-btn-send" onclick="submitNoteModal()">보내기 💌</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 매칭 공개 오버레이 -->
+<div id="matchRevealOverlay" class="match-reveal-overlay hidden">
+  <div style="width:100%;max-width:500px;">
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:40px;margin-bottom:8px;">💘</div>
+      <h2 style="margin:0 0 6px;font-size:22px;font-weight:900;background:linear-gradient(135deg,#ff3c87,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">매칭 결과 공개!</h2>
+      <p style="margin:0;color:rgba(255,255,255,.55);font-size:13px;">서로 호감을 보낸 분들이에요 💕</p>
+    </div>
+    <div id="matchRevealList"></div>
+    <button onclick="document.getElementById('matchRevealOverlay').classList.add('hidden')" style="display:block;margin:24px auto 0;padding:12px 32px;border-radius:12px;border:none;background:linear-gradient(135deg,#ff3c87,#c084fc);color:#fff;font-size:14px;font-weight:800;cursor:pointer;">확인했어요 ✓</button>
+  </div>
+</div>
 
 <script src="firebase-config.js"></script>
 <script type="module" src="router.js"></script>
