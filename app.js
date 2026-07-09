@@ -1188,7 +1188,15 @@ function renderMyNotes(notes) {
   const homeNotesSummary = document.getElementById('homeNotesSummary');
   const homeNotesDetail = document.getElementById('homeNotesDetail');
   if(homeNotesSummary) homeNotesSummary.textContent = `${notes.length}개 받음`;
-  if(homeNotesDetail) homeNotesDetail.textContent = isSecondPartActive ? (notes.length ? '아래 쪽지함에서 확인하세요' : '아직 받은 쪽지가 없어요') : '쪽지 내용은 2부에서 공개돼요';
+  if(homeNotesDetail) {
+    if(!isSecondPartActive) {
+      homeNotesDetail.textContent = '쪽지 내용은 2부에서 공개돼요';
+    } else if(notes.length) {
+      homeNotesDetail.innerHTML = '호감 탭 쪽지함에서 확인하세요 <a href="#/likes" style="color:#ff6eb4;font-weight:700;text-decoration:underline;white-space:nowrap;">→ 쪽지함으로</a>';
+    } else {
+      homeNotesDetail.textContent = '아직 받은 쪽지가 없어요';
+    }
+  }
   if(!listEl) return;
   listEl.innerHTML = '';
 
