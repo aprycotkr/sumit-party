@@ -2761,6 +2761,7 @@ let tableRotationActive = false;  // 현재 rotation 진행 여부
 let tableRotationRound = 0;       // 현재 round
 
 function setCardSettled(card, nextTableDisplay, tableRotationMsg, myCurrentTableEl, tableNum, round) {
+  card.style.display = 'none';
   nextTableDisplay.textContent = tableNum || '-';
   nextTableDisplay.style.color = '#fff';
   card.style.borderColor = '#ffc107';
@@ -2789,8 +2790,8 @@ function listenTableRotation() {
   if(!card) return;
   if(isStaff) { card.style.display = 'none'; return; }
 
-  // 즉시 현재 테이블 표시 (배치 전 기본 상태)
-  card.style.display = 'block';
+  // 로테이션 없을 땐 숨김 (테이블 번호는 파티 카드 뱃지로 표시)
+  card.style.display = 'none';
   setCardSettled(card, nextTableDisplay, tableRotationMsg, myCurrentTableEl, myCurrentTable || tableNumber, null);
 
   if(tableRotationUnsub) tableRotationUnsub();
@@ -2818,6 +2819,8 @@ function listenTableRotation() {
       setCardSettled(card, nextTableDisplay, tableRotationMsg, myCurrentTableEl, myCurrentTable || tableNumber, tableRotationRound > 0 ? tableRotationRound : null);
       return;
     }
+
+    card.style.display = 'block';
 
     if(gender === 'female') {
       setCardSettled(card, nextTableDisplay, tableRotationMsg, myCurrentTableEl, tableNumber, tableRotationRound);
