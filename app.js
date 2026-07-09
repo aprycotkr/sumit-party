@@ -1192,7 +1192,14 @@ function renderMyNotes(notes) {
     if(!isSecondPartActive) {
       homeNotesDetail.textContent = '쪽지 내용은 2부에서 공개돼요';
     } else if(notes.length) {
-      homeNotesDetail.innerHTML = '호감 탭 쪽지함에서 확인하세요 <a href="#/likes" style="color:#ff6eb4;font-weight:700;text-decoration:underline;white-space:nowrap;">→ 쪽지함으로</a>';
+      homeNotesDetail.innerHTML = '호감 탭 쪽지함에서 확인하세요 <a id="_goNoteInbox" href="#/likes" style="color:#ff6eb4;font-weight:700;text-decoration:underline;white-space:nowrap;">→ 쪽지함으로</a>';
+      const _goLink = document.getElementById('_goNoteInbox');
+      if(_goLink) _goLink.addEventListener('click', () => {
+        setTimeout(() => {
+          const inbox = document.getElementById('noteInboxList');
+          if(inbox) inbox.closest('.card, .note-inbox-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 200);
+      });
     } else {
       homeNotesDetail.textContent = '아직 받은 쪽지가 없어요';
     }
