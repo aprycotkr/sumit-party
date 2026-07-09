@@ -196,13 +196,6 @@ const adminDailyPinEl = document.getElementById('adminDailyPin');
 const adminPinDateEl = document.getElementById('adminPinDate');
 const regenPinBtn = document.getElementById('regenPinBtn');
 const entryPinInput = document.getElementById('entryPin');
-if(entryPinInput) {
-  entryPinInput.addEventListener('input', () => {
-    if(entryPinInput.value.replace(/\D/g,'').length >= 4) {
-      setTimeout(() => enterBtn && enterBtn.click(), 80);
-    }
-  });
-}
 
 const getDailyPinDoc = (targetFloor) => 'dailyPin_' + targetFloor;
 
