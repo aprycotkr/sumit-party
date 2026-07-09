@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <meta name="format-detection" content="telephone=no" />
 <title>썸잇 — 썸을 완성하는 시간</title>
+<meta name="theme-color" content="#0a0612" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&display=swap" />
 <link rel="stylesheet" href="style.css" />
 <link rel="icon" type="image/png" href="/attached_assets/썸잇로고_1765977271120.png" />
 </head>
@@ -61,23 +67,23 @@
   </section>
 
   <section id="main" class="hidden">
-    <div class="card" style="background:linear-gradient(135deg, rgba(168,85,247,0.2), rgba(168,85,247,0.12)); border:2px solid rgba(255,255,255,0.3); margin-bottom:20px;">
-      <h2 id="greeting" style="color:#f0f0f0; font-size:1.6em; margin-bottom:8px; text-align:center; font-weight:700; letter-spacing:0.5px;"></h2>
+    <div class="card">
+      <h2 id="greeting"></h2>
       <div id="teamInfoDisplay" class="hidden second-party-banner">
         <div class="second-party-kicker">SECOND SESSION</div>
         <div class="second-party-title">2부 파티가 시작됐습니다!</div>
         <div class="second-party-subtitle">이제 이름과 나이가 공개됩니다</div>
-        <div id="teamNumberText" style="display:none; font-size:32px; font-weight:800; color:#10b981;"></div>
+        <div id="teamNumberText" style="display:none;"></div>
       </div>
-      <div id="mySecondPartyStatus" style="text-align:center; margin-top:10px; font-size:14px; font-weight:600;"></div>
-      <h3 id="farewell" style="color:#f0f0f0; margin-bottom:0; text-align:center; font-weight:500;"></h3>
+      <div id="mySecondPartyStatus"></div>
+      <h3 id="farewell"></h3>
     </div>
 
-    <div id="tableRotationCard" style="display:none; background:linear-gradient(135deg, rgba(255,193,7,0.3), rgba(255,193,7,0.15)); border:3px solid #ffc107; border-radius:16px; padding:20px; margin-bottom:16px; text-align:center;">
-      <div style="font-size:13px; color:#ffd700; margin-bottom:8px; font-weight:600;">🪑 현재 테이블</div>
-      <div id="nextTableDisplay" style="font-size:56px; font-weight:800; color:#fff; font-family:monospace; text-shadow:0 0 20px rgba(255,193,7,0.7);">-</div>
-      <div id="tableRotationMsg" style="font-size:15px; color:#ffd700; font-weight:600; margin-top:6px;">자리배치 대기중...</div>
-      <div id="myCurrentTable" style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:6px;"></div>
+    <div id="tableRotationCard" style="display:none;">
+      <div>🪑 현재 테이블</div>
+      <div id="nextTableDisplay">-</div>
+      <div id="tableRotationMsg">자리배치 대기중...</div>
+      <div id="myCurrentTable"></div>
     </div>
 
     <!-- 이번 라운드 상대 카드 -->
@@ -123,7 +129,7 @@
     </div>
 
     <!-- 나의 현황 -->
-    <div class="card my-status-card" style="padding:16px; margin-bottom:12px;">
+    <div class="card my-status-card">
       <h3>나의 현황</h3>
       <div class="my-status-grid">
         <div class="my-status-item likes" id="homeReceivedLikesCard">
@@ -142,8 +148,8 @@
             <em id="homeMatchSummary">0개 매칭</em>
           </div>
         </div>
-        <div class="my-status-item" id="homeNotesCard" style="grid-column:1/-1;">
-          <span style="font-size:20px;">💌</span>
+        <div class="my-status-item notes" id="homeNotesCard">
+          <span class="my-status-emoji">💌</span>
           <div>
             <strong>받은 쪽지</strong>
             <p id="homeNotesDetail">쪽지 내용은 2부에서 공개돼요</p>
@@ -173,12 +179,12 @@
     </div>
 
     <!-- 대화 소재 추천 -->
-    <div class="card small" style="padding:14px; margin-bottom:8px; max-width:none;">
-      <h3 style="font-size:13px; margin-bottom:10px;">💬 대화 소재 추천</h3>
-      <div id="conversationTopic" style="background:rgba(255,165,0,0.08); border-left:3px solid #ffa500; border-radius:8px; padding:14px 14px; margin-bottom:10px; min-height:48px; color:#fff; font-size:14px; line-height:1.7;">
-        <div style="text-align:center; color:#888; font-size:13px;">💡 버튼을 눌러 대화 소재를 받아보세요</div>
+    <div class="card conversation-card" style="max-width:none;">
+      <h3>💬 대화 소재 추천</h3>
+      <div id="conversationTopic">
+        <div style="text-align:center; color:rgba(255,255,255,0.45); font-size:13px;">💡 버튼을 눌러 대화 소재를 받아보세요</div>
       </div>
-      <button id="getConversationBtn" style="width:100%; padding:10px; font-size:13px; font-weight:700;">💡 새 소재 추천받기</button>
+      <button id="getConversationBtn">💡 새 소재 추천받기</button>
     </div>
 
     <!-- 쪽지함 -->
@@ -377,20 +383,20 @@
 
 
     <div style="display:flex; gap:12px; flex-wrap:wrap;">
-      <div class="card small" style="flex:1; min-width:150px;">
+      <div class="card small request-mini-card" style="flex:1; min-width:150px;">
         <h3>🎵 노래 요청</h3>
-        <input id="songTitle" placeholder="노래 제목" style="margin-bottom:6px; padding:8px; font-size:12px;" />
-        <input id="songArtist" placeholder="가수" style="margin-bottom:6px; padding:8px; font-size:12px;" />
-        <button id="songBtn" style="padding:8px; font-size:12px;">요청</button>
+        <input id="songTitle" placeholder="노래 제목" />
+        <input id="songArtist" placeholder="가수" />
+        <button id="songBtn">요청</button>
       </div>
-      <div class="card small" style="flex:1; min-width:150px;">
+      <div class="card small request-mini-card" style="flex:1; min-width:150px;">
         <h3>🆘 SOS 요청</h3>
-        <input id="sosReason" placeholder="사유 입력" style="margin-bottom:6px; padding:8px; font-size:12px;" />
-        <button id="sosBtn" style="padding:8px; font-size:12px;">SOS 보내기</button>
+        <input id="sosReason" placeholder="사유 입력" />
+        <button id="sosBtn">SOS 보내기</button>
       </div>
     </div>
     <div class="card small" style="margin-top:12px; max-width:none;">
-      <button id="leaveBtn" style="width:100%; padding:12px; font-size:13px; background:rgba(239,68,68,0.18); color:#fca5a5; border:1px solid rgba(239,68,68,0.4); border-radius:8px; font-weight:700; letter-spacing:0.5px;">🚪 파티 나가기</button>
+      <button id="leaveBtn" class="leave-btn">🚪 파티 나가기</button>
     </div>
   </section>
 

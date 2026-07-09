@@ -1,7 +1,7 @@
 export function pageHeader({ title, description }) {
   const header = document.createElement('div');
   header.className = 'page-header';
-  header.innerHTML = `<p class="eyebrow">SUMIT PARTY</p><h1>${title}</h1><p>${description}</p>`;
+  header.innerHTML = `<p class="eyebrow" aria-hidden="true">SUMIT PARTY</p><h1>${title}</h1><p>${description}</p>`;
   return header;
 }
 
@@ -9,7 +9,7 @@ export function actionCard({ icon, title, description, route, cta }) {
   const card = document.createElement('a');
   card.className = 'action-card';
   card.href = route;
-  card.innerHTML = `<span class="action-icon">${icon}</span><span><strong>${title}</strong><small>${description}</small></span><em>${cta}</em>`;
+  card.innerHTML = `<span class="action-icon" aria-hidden="true">${icon}</span><span><strong>${title}</strong><small>${description}</small></span><em aria-hidden="true">${cta}</em>`;
   return card;
 }
 

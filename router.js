@@ -90,9 +90,11 @@ function buildHomePartyCard() {
   card.innerHTML = `
     <div class="home-party-head">
       <div class="home-party-icon">🎉</div>
-      <div>
-        <span class="home-small-badge" id="homePartyBadge">1부 진행 중</span>
-        <span id="homeTableDisplay" style="font-size:11px;font-weight:700;color:#ffc107;background:rgba(255,193,7,0.15);border:1px solid rgba(255,193,7,0.35);border-radius:6px;padding:2px 8px;margin-left:6px;display:inline-block;">테이블 확인 중</span>
+      <div class="home-party-headings">
+        <div class="home-party-badges">
+          <span class="home-small-badge" id="homePartyBadge">1부 진행 중</span>
+          <span class="home-table-chip" id="homeTableDisplay">테이블 확인 중</span>
+        </div>
         <h2>파티 시작! 🎉</h2>
       </div>
     </div>
