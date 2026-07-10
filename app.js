@@ -194,7 +194,8 @@ const clearAllBtn = document.getElementById('clearAllBtn');
 const removeAllParticipantsBtn = document.getElementById('removeAllParticipantsBtn');
 const adminDailyPinEl = document.getElementById('adminDailyPin');
 const adminPinDateEl = document.getElementById('adminPinDate');
-const regenPinBtn = document.getElementById('regenPinBtn');
+const setPinBtn = document.getElementById('setPinBtn');
+const adminPinInput = document.getElementById('adminPinInput');
 const entryPinInput = document.getElementById('entryPin');
 
 const getDailyPinDoc = (targetFloor) => 'dailyPin_' + targetFloor;
@@ -460,9 +461,8 @@ enterBtn.addEventListener('click', async () => {
     if(!enteredPin) { alert('입장 PIN 번호를 입력해 주세요'); return; }
     try {
       const pinSnap = await getDoc(doc(db, 'settings', getDailyPinDoc(floor)));
-      const today = getTodayStr();
-      if(!pinSnap.exists() || pinSnap.data().date !== today) {
-        alert('오늘의 PIN 번호가 아직 설정되지 않았습니다. 스탭에게 문의해 주세요.'); return;
+      if(!pinSnap.exists() || !pinSnap.data().pin) {
+        alert('입장 PIN이 아직 설정되지 않았습니다. 스탭에게 문의해 주세요.'); return;
       }
       if(pinSnap.data().pin !== enteredPin) {
         alert('PIN 번호가 올바르지 않습니다. 스탭에게 문의해 주세요.'); return;
@@ -1708,42 +1708,26 @@ leaveBtn.addEventListener('click', async () => {
   location.reload();
 });
 
-// ── 일일 PIN 관리 ──────────────────────────────────────────────────────────────
+// ── PIN 관리 ──────────────────────────────────────────────────────────────
 
-function getTodayStr() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
-function generateRandomPin() {
-  return String(Math.floor(1000 + Math.random() * 9000));
-}
-
-async function loadOrCreateDailyPin(forceNew = false) {
+async function loadCurrentPin() {
   const pinRef = doc(db, 'settings', getDailyPinDoc(adminFloor));
   const snap = await getDoc(pinRef);
-  const today = getTodayStr();
-
-  let pin;
-  if(!forceNew && snap.exists() && snap.data().date === today) {
-    pin = snap.data().pin;
-  } else {
-    pin = generateRandomPin();
-    await setDoc(pinRef, { pin, date: today });
-  }
-
-  if(adminDailyPinEl) adminDailyPinEl.textContent = pin;
-  if(adminPinDateEl) adminPinDateEl.textContent = `📅 ${today} 기준`;
+  const pin = snap.exists() ? snap.data().pin : null;
+  if(adminDailyPinEl) adminDailyPinEl.textContent = pin || '미설정';
+  if(adminPinDateEl) adminPinDateEl.textContent = pin ? '✅ 설정됨' : '⚠️ 아직 설정되지 않았습니다';
 }
 
-if(regenPinBtn) {
-  regenPinBtn.addEventListener('click', async () => {
-    if(!confirm('PIN 번호를 새로 발급하시겠습니까? 기존 PIN은 사용할 수 없습니다.')) return;
-    await loadOrCreateDailyPin(true);
-    alert('새 PIN 번호가 발급되었습니다.');
+if(setPinBtn) {
+  setPinBtn.addEventListener('click', async () => {
+    const newPin = adminPinInput ? adminPinInput.value.replace(/\D/g, '').slice(0, 4) : '';
+    if(newPin.length !== 4) { alert('PIN은 숫자 4자리로 입력해주세요.'); return; }
+    if(!confirm(`PIN을 ${newPin}(으)로 설정하시겠습니까?`)) return;
+    await setDoc(doc(db, 'settings', getDailyPinDoc(adminFloor)), { pin: newPin });
+    if(adminDailyPinEl) adminDailyPinEl.textContent = newPin;
+    if(adminPinDateEl) adminPinDateEl.textContent = '✅ 설정됨';
+    if(adminPinInput) adminPinInput.value = '';
+    alert(`PIN이 ${newPin}으로 설정됐습니다.`);
   });
 }
 
@@ -1787,7 +1771,7 @@ adminLoginBtn.addEventListener('click', async () => {
   show(adminPanel);
   initAdminTabs();
   loadAdminRealtime();
-  await loadOrCreateDailyPin();
+  await loadCurrentPin();
 });
 
 function initAdminTabs() {
