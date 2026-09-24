@@ -1,0 +1,10 @@
+#couplePosterBtn { margin-top:12px; background:linear-gradient(110deg,#7864bc,#bd608d); color:white; }
+#couplePosterBtn:disabled { opacity:.45; cursor:not-allowed; }
+.couple-poster-dialog { box-sizing:border-box; width:min(620px,94vw); max-height:92dvh; padding:22px; border:1px solid #514955; border-radius:20px; background:#19171d; color:#fff; overflow:auto; }
+.couple-poster-dialog::backdrop { background:#000c; }
+.couple-poster-dialog h2 { clear:both; font-size:18px; margin:15px 0 8px; }
+.couple-poster-dialog p { font-size:13px; color:#c6bfce; }
+.couple-poster-dialog section { margin:20px 0 28px; }
+.couple-poster-dialog img { display:block; width:100%; height:auto; border-radius:6px; }
+.couple-poster-dialog .poster-close { float:right; width:auto; padding:8px 18px; margin:0; background:#37313f; color:white; }
+.couple-poster-dialog .poster-download { display:block; text-align:center; padding:14px; margin:12px 0; border-radius:12px; background:linear-gradient(110deg,#7864bc,#bd608d); color:white; font-weight:700; text-decoration:none; }
