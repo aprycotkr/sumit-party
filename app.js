@@ -1,3 +1,4 @@
+import { setupCouplePoster } from './couple-poster.js';
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
 import { 
   getFirestore, 
@@ -188,6 +189,7 @@ const adminSongs = document.getElementById('adminSongs');
 const adminStories = document.getElementById('adminStories');
 const adminCupid = document.getElementById('adminCupid');
 const adminCouples = document.getElementById('adminCouples');
+const couplePoster = setupCouplePoster(document.getElementById('couplePosterBtn'));
 const adminFinal = document.getElementById('adminFinal');
 const adminMatching = document.getElementById('adminMatching');
 const clearAllBtn = document.getElementById('clearAllBtn');
@@ -1749,6 +1751,7 @@ if(endParty2Btn) {
 }
 
 function resetAdminPanel() {
+  couplePoster.update('', []);
   if(adminPanel && !adminPanel.classList.contains('hidden')) {
     hide(adminPanel);
     if(adminPw) adminPw.value = '';
@@ -1768,6 +1771,7 @@ adminLoginBtn.addEventListener('click', async () => {
   if(!adminFloor) { alert('지점을 선택해 주세요'); return; }
   if(!adminPasswordHash) { alert('관리자 비밀번호 설정이 없습니다'); return; }
   if(await sha256Hex(pw) !== adminPasswordHash) { alert('비밀번호가 틀렸습니다'); return; }
+  couplePoster.update(adminFloor, []);
   show(adminPanel);
   initAdminTabs();
   loadAdminRealtime();
@@ -2103,6 +2107,7 @@ function loadAdminRealtime() {
     });
   });
 
+  const posterFloor = adminFloor;
   const finalQ = query(collection(db, 'final'), where('floor','==',adminFloor));
   onSnapshot(finalQ, snap => {
     adminFinal.innerHTML='';
@@ -2138,6 +2143,9 @@ function loadAdminRealtime() {
       });
     });
     
+    if (posterFloor !== adminFloor || adminPanel.classList.contains('hidden')) return;
+    couplePoster.update(posterFloor, couples);
+
     // 커플탄생 표시
     adminCouples.innerHTML='';
     const adminCoupleContacts = document.getElementById('adminCoupleContacts');
