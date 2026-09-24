@@ -1,0 +1,7 @@
+{
+  "hosting": {
+    "site": "sumit-party",
+    "public": ".",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**", "tests/**", "firebase-debug.log", "firebase-debug.*.log"]
+  }
+}

@@ -11,9 +11,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700;800&display=swap" />
-<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="style.css?v=10" />
 <link rel="icon" type="image/png" href="/attached_assets/썸잇로고_1765977271120.png" />
-<link rel="stylesheet" href="couple-poster.css">
+<link rel="stylesheet" href="couple-poster.css?v=1">
 </head>
 <body>
 <main class="wrap">
@@ -444,8 +444,8 @@
         <div id="adminDailyPin">----</div>
         <div id="adminPinDate"></div>
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <input id="adminPinInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="4자리" style="flex:1;padding:8px;font-size:20px;letter-spacing:6px;text-align:center;background:rgba(255,255,255,0.07);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;width:0;" />
-          <button id="setPinBtn" style="padding:8px 16px;font-size:13px;font-weight:700;background:#10b981;color:#fff;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">설정</button>
+          <input id="adminPinInput" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="4자리" style="flex:1;padding:8px;font-size:20px;letter-spacing:6px;text-align:center;background:rgba(255,255,255,0.07);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;min-width:0;" />
+          <button id="setPinBtn" style="width:auto;flex-shrink:0;padding:8px 16px;font-size:13px;font-weight:700;background:#10b981;color:#fff;border:none;border-radius:8px;cursor:pointer;white-space:nowrap;">설정</button>
         </div>
       </div>
 
@@ -602,8 +602,8 @@
   </div>
 </div>
 
-<script src="firebase-config.js"></script>
-<script type="module" src="router.js"></script>
-<script type="module" src="app.js"></script>
+<script src="firebase-config.js?v=10"></script>
+<script type="module" src="router.js?v=10"></script>
+<script type="module" src="app.js?v=11"></script>
 </body>
 </html>
