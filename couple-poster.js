@@ -1,4 +1,4 @@
-const BRANCHES = { busan: '부산점', daegu: '대구점' };
+const BRANCHES = { busan: '부산점', daegu: '대구점', gumi: '구미점' };
 const PAGE_SIZE = 4;
 let assetPromise;
 

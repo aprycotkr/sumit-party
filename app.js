@@ -30,6 +30,7 @@ function getFloorText(floorValue) {
   switch(floorValue) {
     case 'daegu': return '대구점';
     case 'busan': return '부산점';
+    case 'gumi': return '구미점';
     default: return floorValue;
   }
 }
@@ -38,6 +39,7 @@ function getFloorFullName(floorValue) {
   switch(floorValue) {
     case 'daegu': return '대구점';
     case 'busan': return '부산점';
+    case 'gumi': return '구미점';
     default: return floorValue;
   }
 }
@@ -46,6 +48,7 @@ function getFloorColor(floorValue) {
   switch(floorValue) {
     case 'daegu': return '#64c8ff';
     case 'busan': return '#ff8fbd';
+    case 'gumi': return '#7be0a0';
     default: return '#999';
   }
 }
@@ -1620,7 +1623,7 @@ if(changeNickBtn) changeNickBtn.addEventListener('click', async () => {
   
   try {
     // 중복 확인
-    const q = query(collection(db, 'participants'), where('nickname','==',newNick));
+    const q = query(collection(db, 'participants'), where('nickname','==',newNick), where('floor','==',floor));
     const snapshot = await getDocs(q);
     if(!snapshot.empty && snapshot.docs[0].id !== participantDocId) {
       alert('이미 사용중인 닉네임입니다');
