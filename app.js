@@ -2723,29 +2723,6 @@ let tableMapParticipantsUnsub = null;
 let tableMapRotationUnsub = null;
 let adminParticipantsUnsub = null;
 
-// 테이블 레이아웃 특수 셀 상수
-const CELL_TOILET   = 'TOILET';    // 화장실
-const CELL_ENTRANCE = 'ENTRANCE';  // 입구 (화장실 오른쪽)
-const CELL_KITCHEN  = 'KITCHEN';   // 주방
-const CELL_PILLAR   = 'PILLAR';    // 기둥
-const CELL_WINDOW     = 'WINDOW';      // 창가
-const CELL_PROJECTOR  = 'PROJECTOR';   // 빔프로젝터
-
-// 7열 그리드 레이아웃
-// Row0: 화장실 | 입구 | 기둥 | 기둥 | 기둥 | (빈) | 14번
-// Row1: 주방   |  13번 | 12번 | 11번 | 10번 | (빈) | (빈)
-// Row2: (빈)   |   9번 | 기둥 | (빈) | (빈) |  8번 | (빈)
-// Row3: (빈)   |   7번 | (빈) |  6번 | (빈) |  5번 | (빈)
-// Row4: (빈)   |   4번 |  3번 | (빈) |  2번 |  1번 | (빈)
-const TABLE_LAYOUT = [
-  [CELL_TOILET,  CELL_ENTRANCE, CELL_PILLAR, CELL_PILLAR, CELL_PILLAR, 14,          CELL_WINDOW],
-  [CELL_KITCHEN, 13,            12,          11,          10,          null,        CELL_WINDOW],
-  [CELL_PROJECTOR, 9,            CELL_PILLAR, null,        null,          8,         CELL_WINDOW],
-  [CELL_PROJECTOR, 7,            null,         6,           null,          5,        CELL_WINDOW],
-  [CELL_PROJECTOR, 4,             3,           null,         2,            1,        CELL_WINDOW]
-];
-const KITCHEN_TABLE = null;
-
 function renderTableMap(container, participants, isAdmin = false) {
   if(!container) return;
 
@@ -2777,226 +2754,99 @@ function renderTableMap(container, participants, isAdmin = false) {
     else unassigned.push(p);
   });
 
-  if(!isAdmin) {
-    const tableNumbers = Object.keys(byTable)
-      .map(Number)
-      .filter(tNum => byTable[tNum].length > 0)
-      .sort((a, b) => {
-        const aIsMine = Number(a) === Number(myCurrentTable || tableNumber);
-        const bIsMine = Number(b) === Number(myCurrentTable || tableNumber);
-        if(aIsMine !== bIsMine) return aIsMine ? -1 : 1;
-        return a - b;
-      });
+  // 참가자·관리자 모두 테이블별 목록으로 표시
+  // 관리자: 실명·나이 항상 공개, 테이블 번호순 정렬
+  const myTable = isAdmin ? null : Number(myCurrentTable || tableNumber);
+  const showPrivate = isAdmin || isSecondPartActive;
+  const tableNumbers = Object.keys(byTable)
+    .map(Number)
+    .filter(tNum => byTable[tNum].length > 0)
+    .sort((a, b) => {
+      const aIsMine = a === myTable;
+      const bIsMine = b === myTable;
+      if(aIsMine !== bIsMine) return aIsMine ? -1 : 1;
+      return a - b;
+    });
 
-    const renderPerson = (p) => {
-      const isMale = p.gender === 'male';
-      const genderText = isMale ? '남성' : '여성';
-      const genderClass = isMale ? 'male' : 'female';
-      const displayName = getParticipantDisplayName(p);
-      const avatarText = displayName.slice(0, 1);
-      const real = p.realName || '이름 미입력';
-      const age = p.age ? `${p.age}세` : '나이 미입력';
-      const detail = isSecondPartActive ? `${genderText} · ${real} · ${age}` : `${genderText} · 이름/나이 비공개`;
-      const secondBadge = p.secondParty ? '<span class="table-person-badge">2부 참여</span>' : '<span class="table-person-badge muted">2부 불참</span>';
-      return `
-        <div class="table-person-card ${genderClass}">
-          <div class="table-person-avatar">${escapeHtml(avatarText)}</div>
-          <div class="table-person-info">
-            <strong>${escapeHtml(displayName)}</strong>
-            <span>${escapeHtml(detail)}</span>
-          </div>
-          ${isSecondPartActive ? secondBadge : ''}
+  const renderPerson = (p) => {
+    const isMale = p.gender === 'male';
+    const genderText = isMale ? '남성' : '여성';
+    const genderClass = isMale ? 'male' : 'female';
+    const displayName = getParticipantDisplayName(p);
+    const avatarText = displayName.slice(0, 1);
+    const real = p.realName || '이름 미입력';
+    const age = p.age ? `${p.age}세` : '나이 미입력';
+    const detail = showPrivate ? `${genderText} · ${real} · ${age}` : `${genderText} · 이름/나이 비공개`;
+    return `
+      <div class="table-person-card ${genderClass}">
+        <div class="table-person-avatar">${escapeHtml(avatarText)}</div>
+        <div class="table-person-info">
+          <strong>${escapeHtml(displayName)}</strong>
+          <span>${escapeHtml(detail)}</span>
         </div>
-      `;
-    };
+      </div>
+    `;
+  };
 
-    let participantHtml = '';
-    if(tableNumbers.length === 0) {
-      participantHtml = '<div class="participant-empty">표시할 테이블 참가자가 없습니다</div>';
-    } else {
-      participantHtml = tableNumbers.map(tNum => {
-        const people = byTable[tNum].slice().sort((a, b) => {
-          if(a.gender !== b.gender) return a.gender === 'female' ? -1 : 1;
-          return (a.nickname || '').localeCompare(b.nickname || '', 'ko');
-        });
-        const maleCount = people.filter(p => p.gender === 'male').length;
-        const femaleCount = people.filter(p => p.gender === 'female').length;
-        const isMine = Number(tNum) === Number(myCurrentTable || tableNumber);
-        return `
-          <section class="table-group-card ${isMine ? 'current' : ''}">
-            <div class="table-group-head">
-              <div class="table-number-badge">${tNum}</div>
-              <div>
-                <h3>테이블 ${tNum}</h3>
-                <div class="table-group-meta">
-                  <span class="male">남 ${maleCount}</span>
-                  <span class="female">여 ${femaleCount}</span>
-                  <span>총 ${people.length}명</span>
-                  ${isMine ? '<b>내 테이블</b>' : ''}
-                </div>
+  let participantHtml = '';
+  if(isAdmin) {
+    const totalMales = dedupedParticipants.filter(p => p.gender === 'male').length;
+    const totalFemales = dedupedParticipants.filter(p => p.gender === 'female').length;
+    participantHtml += `<div style="display:flex; justify-content:center; gap:16px; padding:6px 10px; background:rgba(255,255,255,0.05); border-radius:8px; font-size:13px; font-weight:700;">
+      <span style="color:#64b5f6;">●남 ${totalMales}명</span>
+      <span style="color:rgba(255,255,255,0.3);">|</span>
+      <span style="color:#f48fb1;">●여 ${totalFemales}명</span>
+      <span style="color:rgba(255,255,255,0.3);">|</span>
+      <span style="color:#e0e0e0;">합계 ${totalMales + totalFemales}명</span>
+    </div>`;
+  }
+  if(tableNumbers.length === 0) {
+    participantHtml += '<div class="participant-empty">표시할 테이블 참가자가 없습니다</div>';
+  } else {
+    participantHtml += tableNumbers.map(tNum => {
+      const people = byTable[tNum].slice().sort((a, b) => {
+        if(a.gender !== b.gender) return a.gender === 'female' ? -1 : 1;
+        return (a.nickname || '').localeCompare(b.nickname || '', 'ko');
+      });
+      const maleCount = people.filter(p => p.gender === 'male').length;
+      const femaleCount = people.filter(p => p.gender === 'female').length;
+      const isMine = tNum === myTable;
+      return `
+        <section class="table-group-card ${isMine ? 'current' : ''}">
+          <div class="table-group-head">
+            <div class="table-number-badge">${tNum}</div>
+            <div>
+              <h3>테이블 ${tNum}</h3>
+              <div class="table-group-meta">
+                <span class="male">남 ${maleCount}</span>
+                <span class="female">여 ${femaleCount}</span>
+                <span>총 ${people.length}명</span>
+                ${isMine ? '<b>내 테이블</b>' : ''}
               </div>
             </div>
-            <div class="table-person-list">${people.map(renderPerson).join('')}</div>
-          </section>
-        `;
-      }).join('');
-    }
-
-    if(unassigned.length > 0) {
-      participantHtml += `
-        <section class="table-group-card">
-          <div class="table-group-head">
-            <div class="table-number-badge muted">?</div>
-            <div>
-              <h3>미배정</h3>
-              <div class="table-group-meta"><span>총 ${unassigned.length}명</span></div>
-            </div>
           </div>
-          <div class="table-person-list">${unassigned.map(renderPerson).join('')}</div>
+          <div class="table-person-list">${people.map(renderPerson).join('')}</div>
         </section>
       `;
-    }
-
-    container.innerHTML = `<div class="participant-table-list">${participantHtml}</div>`;
-    return;
+    }).join('');
   }
 
-  function tableCell(tNum) {
-    const people = byTable[tNum] || [];
-
-    let cell = `<div style="background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:4px 3px; min-height:44px;">`;
-    cell += `<div style="text-align:center; font-size:11px; font-weight:700; color:#ffd700; margin-bottom:2px; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:3px;">${tNum}번</div>`;
-
-    if(people.length === 0) {
-      cell += `<div style="color:#444; font-size:10px; text-align:center; margin-top:4px;">-</div>`;
-    } else {
-      people.forEach(p => {
-        const isMale = p.gender === 'male';
-        const dot = isMale
-          ? `<span style="color:#64b5f6; font-size:9px; flex-shrink:0;">●남</span>`
-          : `<span style="color:#f48fb1; font-size:9px; flex-shrink:0;">●여</span>`;
-        const noSecondBadge = isAdmin && p.secondParty === false ? `<span style="color:#f59e0b; font-size:9px; font-weight:700; flex-shrink:0;">미</span>` : '';
-        const dispNick = getParticipantDisplayName(p);
-        cell += `<div style="display:flex; align-items:center; gap:2px; margin-bottom:2px; line-height:1.3;">${dot}<span style="font-size:10px; color:#e0e0e0; word-break:break-all; flex:1; min-width:0;">${dispNick}</span>${noSecondBadge}</div>`;
-      });
-    }
-    cell += `</div>`;
-    return cell;
-  }
-
-  const totalMales   = dedupedParticipants.filter(p => p.gender === 'male').length;
-  const totalFemales = dedupedParticipants.filter(p => p.gender === 'female').length;
-  let html = `<div style="display:flex; justify-content:center; gap:16px; margin-bottom:8px; padding:6px 10px; background:rgba(255,255,255,0.05); border-radius:8px; font-size:13px; font-weight:700;">
-    <span style="color:#64b5f6;">●남 ${totalMales}명</span>
-    <span style="color:rgba(255,255,255,0.3);">|</span>
-    <span style="color:#f48fb1;">●여 ${totalFemales}명</span>
-    <span style="color:rgba(255,255,255,0.3);">|</span>
-    <span style="color:#e0e0e0;">합계 ${totalMales + totalFemales}명</span>
-  </div>`;
-
-  // 단일 CSS 그리드 — 빔프로젝터·창가는 grid-row span으로 병합
-  // 가로 스크롤 래퍼: 모바일에서 잘리지 않도록 min-width 보장
-  html += `<div style="overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:4px;">`;
-  html += `<div style="display:grid; grid-template-columns:36px repeat(5,1fr) 34px; gap:4px; min-width:520px;">`;
-
-  TABLE_LAYOUT.forEach((row, rowIdx) => {
-    row.forEach((cell, colIdx) => {
-      // 병합 셀은 아래에서 별도 렌더링
-      if(cell === CELL_PROJECTOR || cell === CELL_WINDOW) return;
-      // 기둥: 상단 3개(row0 col2~4)는 병합 처리, row2 col2는 단독
-      if(cell === CELL_PILLAR && rowIdx === 0) return;  // 상단 3개 병합 → 아래에서 한 번에 렌더
-
-      const pos = `grid-row:${rowIdx+1}; grid-column:${colIdx+1};`;
-      if(cell === null) {
-        html += `<div style="${pos} min-height:44px;"></div>`;
-      } else if(cell === CELL_PILLAR) {
-        // row2 단독 기둥
-        html += `<div style="${pos} background:rgba(120,120,120,0.15); border:1px solid rgba(150,150,150,0.25); border-radius:6px; min-height:44px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:2px;">
-          <span style="font-size:12px;">🏛️</span>
-          <span style="font-size:8px; color:#888; font-weight:600;">기둥</span>
-        </div>`;
-      } else if(cell === CELL_TOILET) {
-        html += `<div style="${pos} background:rgba(100,181,246,0.08); border:1px solid rgba(100,181,246,0.2); border-radius:6px; min-height:44px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:2px;">
-          <span style="font-size:12px;">🚻</span>
-          <span style="font-size:9px; color:#64b5f6; font-weight:600;">화장실</span>
-        </div>`;
-      } else if(cell === CELL_ENTRANCE) {
-        html += `<div style="${pos} background:rgba(129,199,132,0.08); border:1px solid rgba(129,199,132,0.25); border-radius:6px; min-height:44px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:2px;">
-          <span style="font-size:12px;">🚪</span>
-          <span style="font-size:9px; color:#81c784; font-weight:600;">입구</span>
-        </div>`;
-      } else if(cell === CELL_KITCHEN) {
-        html += `<div style="${pos} background:rgba(251,191,36,0.08); border:1px solid rgba(251,191,36,0.2); border-radius:6px; min-height:44px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:2px;">
-          <span style="font-size:12px;">🍳</span>
-          <span style="font-size:9px; color:#fbbf24; font-weight:600;">주방</span>
-        </div>`;
-      } else {
-        html += `<div style="${pos}">${tableCell(cell)}</div>`;
-      }
-    });
-  });
-
-  // 상단 기둥 3개 병합: row 1, col 3~5 (grid 1-indexed)
-  html += `<div style="grid-row:1/2; grid-column:3/6; background:rgba(120,120,120,0.15); border:1px solid rgba(150,150,150,0.25); border-radius:6px; min-height:44px; display:flex; align-items:center; justify-content:center; flex-direction:row; gap:4px;">
-    <span style="font-size:13px;">🏛️</span>
-    <span style="font-size:9px; color:#999; font-weight:700; letter-spacing:0.5px;">기  둥</span>
-  </div>`;
-
-  // 빔프로젝터: col 1(index 0), row 3~5 → 3개 행 병합
-  html += `<div style="grid-row:3/6; grid-column:1/2; background:rgba(220,180,255,0.07); border:1px solid rgba(220,180,255,0.3); border-radius:8px; display:flex; align-items:center; justify-content:center; overflow:hidden;">
-    <span style="font-size:10px; color:#dcb4ff; font-weight:700; writing-mode:vertical-lr; text-orientation:upright; letter-spacing:2px; line-height:1;">빔프로젝터</span>
-  </div>`;
-
-  // 창가: col 7(index 6), row 1~5 → 5개 행 전체 병합
-  html += `<div style="grid-row:1/6; grid-column:7/8; background:rgba(147,210,255,0.06); border:1px solid rgba(147,210,255,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:2px; padding:4px 1px;">
-    <span style="font-size:14px;">🪟</span>
-    <span style="font-size:8px; color:#93d2ff; font-weight:700;">창가</span>
-    <div style="width:1px; height:8px; background:rgba(147,210,255,0.2);"></div>
-    <svg width="28" height="52" viewBox="0 0 38 68" xmlns="http://www.w3.org/2000/svg">
-      <!-- 디스펜서 본체 -->
-      <rect x="4" y="2" width="30" height="38" rx="4" fill="rgba(180,210,255,0.12)" stroke="rgba(147,210,255,0.45)" stroke-width="1.5"/>
-      <!-- 상단 로고 패널 -->
-      <rect x="8" y="6" width="22" height="11" rx="2" fill="rgba(100,170,255,0.18)" stroke="rgba(100,180,255,0.35)" stroke-width="1"/>
-      <text x="19" y="14" text-anchor="middle" font-size="5" font-weight="700" fill="#93d2ff" font-family="sans-serif">HIGHBALL</text>
-      <!-- 아이스 버튼 -->
-      <circle cx="13" cy="26" r="4.5" fill="rgba(150,220,255,0.2)" stroke="rgba(150,220,255,0.5)" stroke-width="1"/>
-      <text x="13" y="28.5" text-anchor="middle" font-size="5" fill="#b0e0ff" font-family="sans-serif">❄</text>
-      <!-- 음료 버튼 (주황/하이볼) -->
-      <circle cx="25" cy="26" r="4.5" fill="rgba(255,200,80,0.2)" stroke="rgba(255,200,80,0.5)" stroke-width="1"/>
-      <text x="25" y="28.5" text-anchor="middle" font-size="5.5" fill="#ffd580" font-family="sans-serif">🥃</text>
-      <!-- 탭/수도꼭지 -->
-      <rect x="13" y="40" width="12" height="5" rx="2" fill="rgba(180,200,230,0.3)" stroke="rgba(180,200,230,0.55)" stroke-width="1.2"/>
-      <rect x="17.5" y="45" width="3" height="7" rx="1" fill="rgba(180,200,230,0.3)" stroke="rgba(180,200,230,0.55)" stroke-width="1"/>
-      <!-- 물방울 -->
-      <ellipse cx="19" cy="55" rx="1.5" ry="2.2" fill="rgba(147,210,255,0.6)"/>
-      <ellipse cx="19" cy="59.5" rx="1" ry="1.5" fill="rgba(147,210,255,0.35)"/>
-      <!-- 컵 트레이 -->
-      <rect x="6" y="37" width="26" height="3" rx="1" fill="rgba(147,210,255,0.15)" stroke="rgba(147,210,255,0.3)" stroke-width="1"/>
-    </svg>
-    <span style="font-size:8px; color:#ffd580; font-weight:700; letter-spacing:0.5px; text-align:center; line-height:1.4;">하이볼<br>리필</span>
-  </div>`;
-
-  html += `</div></div>`;  // 그리드 닫기 + 스크롤 래퍼 닫기
-
-  // 미배정 참여자 섹션
   if(unassigned.length > 0) {
-    html += `<div style="margin-top:10px; padding:8px 10px; background:rgba(255,200,0,0.07); border:1px solid rgba(255,200,0,0.25); border-radius:8px;">`;
-    html += `<div style="font-size:11px; font-weight:700; color:#ffd700; margin-bottom:6px;">🪑 미배정 (${unassigned.length}명)</div>`;
-    html += `<div style="display:flex; flex-wrap:wrap; gap:4px;">`;
-    unassigned.forEach(p => {
-      const isMale = p.gender === 'male';
-      const dotColor = isMale ? '#64b5f6' : '#f48fb1';
-      const dotLabel = isMale ? '남' : '여';
-      const dispNick = getParticipantDisplayName(p);
-      html += `<span style="display:inline-flex; align-items:center; gap:2px; background:rgba(255,255,255,0.06); border-radius:4px; padding:2px 6px; font-size:10px;">
-        <span style="color:${dotColor}; font-size:9px;">●${dotLabel}</span>
-        <span style="color:#e0e0e0;">${dispNick}</span>
-      </span>`;
-    });
-    html += `</div></div>`;
+    participantHtml += `
+      <section class="table-group-card">
+        <div class="table-group-head">
+          <div class="table-number-badge muted">?</div>
+          <div>
+            <h3>미배정</h3>
+            <div class="table-group-meta"><span>총 ${unassigned.length}명</span></div>
+          </div>
+        </div>
+        <div class="table-person-list">${unassigned.map(renderPerson).join('')}</div>
+      </section>
+    `;
   }
 
-  container.innerHTML = html || '<div style="color:#666; font-size:12px; text-align:center;">참가자 없음</div>';
+  container.innerHTML = `<div class="participant-table-list">${participantHtml}</div>`;
 }
 
 function updateTableMaps() {
