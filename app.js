@@ -17,7 +17,8 @@ import {
   limit,
   writeBatch,
   deleteField,
-  runTransaction
+  runTransaction,
+  serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const firebaseConfig = window.SUMIT_FIREBASE_CONFIG;
@@ -102,8 +103,20 @@ function getParticipantDisplayName(p) {
   return nicknameValue || realNameValue || '닉네임 없음';
 }
 
+function normalizePhone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+// 같은 사람인지: 성별 + 실명 + 전화번호(숫자만)가 모두 같아야 함
+function isSameParticipantIdentity(a, b) {
+  return (a?.gender || '') === (b?.gender || '')
+    && String(a?.realName || '').trim() === String(b?.realName || '').trim()
+    && normalizePhone(a?.phoneNumber) === normalizePhone(b?.phoneNumber);
+}
+
+// 실명·전화번호까지 포함 → 닉네임만 같은 다른 사람은 중복으로 보지 않음
 function getParticipantDedupeKey(p) {
-  return `${String(p?.floor || 'floor2')}|${String(p?.gender || '')}|${getParticipantDisplayName(p).toLowerCase()}`;
+  return `${String(p?.floor || 'floor2')}|${String(p?.gender || '')}|${getParticipantDisplayName(p).toLowerCase()}|${String(p?.realName || '').trim()}|${normalizePhone(p?.phoneNumber)}`;
 }
 
 function isBetterParticipantRecord(candidate, current) {
@@ -217,12 +230,6 @@ const popularityList = document.getElementById('popularityList');
 const popularityBtn = document.getElementById('popularityBtn');
 const myPopularity = document.getElementById('myPopularity');
 
-const timerDisplay = document.getElementById('timerDisplay');
-const timerText = document.getElementById('timerText');
-const timerMinutes = document.getElementById('timerMinutes');
-const startTimerBtn = document.getElementById('startTimerBtn');
-const stopTimerBtn = document.getElementById('stopTimerBtn');
-const adminTimerStatus = document.getElementById('adminTimerStatus');
 const startSecondPartBtn = document.getElementById('startSecondPartBtn');
 const stopSecondPartBtn = document.getElementById('stopSecondPartBtn');
 const adminPartyStatus = document.getElementById('adminPartyStatus');
@@ -241,16 +248,8 @@ let secondParty = true;
 let realName = "";
 let isSecondPartActive = false;
 let activeLikeStatusTab = 'final';
-let timerAlertShown = false;
 let matchRevealShown = false;
 let _noteModalResolve = null;
-let _timerEndTime = 0;
-let _timerIsActive = false;
-let _timerUnsub = null;
-let _adminTimerEndTime = 0;
-let _adminTimerIsActive = false;
-let _adminTimerUnsub = null;
-let _adminTimerAutoRotateDone = false;
 let lastReceivedPopularityCount = -1;
 let lastReceivedNoteCount = -1;
 let lastSosCount = -1;
@@ -317,12 +316,15 @@ async function restoreSession() {
         listenMyStats();
         listenVote3rd();
       } else {
-        // 문서가 없으면 닉네임+층으로 다시 찾기
+        // 문서가 없으면 닉네임+층으로 다시 찾기 — 성별·실명·전화번호까지 같은 본인 기록만
+        const savedPhone = localStorage.getItem('sumit_phone');
+        const savedIdentity = { gender: savedGender, realName: localStorage.getItem('sumit_realName') || '', phoneNumber: savedPhone || '' };
         const q = query(collection(db, 'participants'), where('nickname','==',savedNickname), where('floor','==',savedFloor));
         const snapshot = await getDocs(q);
-        if(!snapshot.empty) {
-          const fbData2 = snapshot.docs[0].data();
-          participantDocId = snapshot.docs[0].id;
+        const ownDoc = savedPhone === null ? null : snapshot.docs.find(d => isSameParticipantIdentity(d.data(), savedIdentity));
+        if(ownDoc) {
+          const fbData2 = ownDoc.data();
+          participantDocId = ownDoc.id;
           localStorage.setItem('sumit_docId', participantDocId);
           nickname = savedNickname;
           gender = savedGender;
@@ -385,7 +387,6 @@ function setMyInfo() {
   listenImageGame();
   listenBalanceGame();
   listenParty2();
-  listenTimer();
 
   // 모바일 백그라운드 복귀 시 게임 상태 재조회 (한 번만 등록)
   if(!window._gameVisibilityRegistered) {
@@ -492,7 +493,7 @@ enterBtn.addEventListener('click', async () => {
       const matchingDocs = snapshot.docs
         .filter(d => {
           const data = d.data();
-          return data.gender === gender && (data.realName || '') === (realName || '') && (data.phoneNumber || '') === (phoneNumber || '');
+          return isSameParticipantIdentity(data, { gender, realName, phoneNumber });
         })
         .sort((a, b) => {
           const aData = a.data();
@@ -502,7 +503,7 @@ enterBtn.addEventListener('click', async () => {
       const existingDoc = matchingDocs[0] || snapshot.docs[0];
       const existingData = existingDoc.data();
       
-      if(existingData.gender === gender && (existingData.realName || '') === (realName || '') && (existingData.phoneNumber || '') === (phoneNumber || '')) {
+      if(isSameParticipantIdentity(existingData, { gender, realName, phoneNumber })) {
         participantDocId = existingDoc.id;
         // groupKey는 최초 등록 때 정해진 값을 유지 → 재입장해도 그룹 불변
         myGroupKey = existingData.groupKey || (tableNumber ? String(tableNumber) : null);
@@ -537,38 +538,35 @@ enterBtn.addEventListener('click', async () => {
       const groupKey = tableNumber ? String(tableNumber) : null;
       myGroupKey = groupKey;
 
-      // 늦게 합류한 남성: 같은 groupKey의 현재 위치로 동기화
-      let initialCurrentTable = tableNumber;
-      if(gender === 'male' && groupKey) {
-        try {
-          const groupSnap = await getDocs(query(
-            collection(db, 'participants'),
-            where('groupKey', '==', groupKey),
-            where('gender', '==', 'male'),
-            where('floor', '==', floor)
-          ));
-          groupSnap.forEach(d => {
-            const ct = d.data().currentTable;
-            if(ct) initialCurrentTable = ct;
-          });
-        } catch(e) { /* fallback to tableNumber */ }
-      }
+      // 늦게 합류한 남성도 입장한 테이블에서 시작 → 지금 그 테이블에 앉은 남자들과 함께 이동
+      const initialCurrentTable = tableNumber;
 
       const joinedTs = Date.now();
-      const docRef = await addDoc(collection(db, 'participants'), {nickname, gender, floor, tableNumber, currentTable: gender === 'male' ? initialCurrentTable : null, groupKey, isStaff, secondParty, realName, age, phoneNumber, cupidCount:2, finalCompleted:false, joined:joinedTs, updated: joinedTs});
+      const docRef = await addDoc(collection(db, 'participants'), {nickname, gender, floor, tableNumber, currentTable: gender === 'male' ? initialCurrentTable : null, groupKey, isStaff, secondParty, realName, age, phoneNumber, cupidCount:2, finalCompleted:false, joined:joinedTs, updated: joinedTs, createdAt: serverTimestamp()});
       participantDocId = docRef.id;
 
-      // 레이스 컨디션 방어: 동시 입장으로 동일 닉네임 문서가 2개 생성됐을 경우 오래된 것 삭제
+      // 레이스 컨디션 방어: 동시 입장으로 같은 닉네임이 2개 생기면 나중에 등록한 쪽(나)이 물러남
+      // 다른 사람 기록은 지우지 않음. 순서는 서버 시간 기준이라 두 폰이 같은 결론을 냄
       try {
-        const dupQ = query(collection(db, 'participants'), where('nickname','==',nickname), where('floor','==',floor));
-        const dupSnap = await getDocs(dupQ);
-        if(dupSnap.size > 1) {
-          const sorted = dupSnap.docs.slice().sort((a,b) => (b.data().updated||b.data().joined||0) - (a.data().updated||a.data().joined||0));
-          for(let i = 1; i < sorted.length; i++) {
-            if(sorted[i].id !== participantDocId) await deleteDoc(sorted[i].ref);
-          }
+        const dupSnap = await getDocs(query(collection(db, 'participants'), where('nickname','==',nickname), where('floor','==',floor)));
+        const createdMs = (d, fallback) => d.data().createdAt?.toMillis?.() ?? fallback;
+        const myDoc = dupSnap.docs.find(d => d.id === participantDocId);
+        const myCreated = myDoc ? createdMs(myDoc, Infinity) : Infinity;
+        const takenByOther = dupSnap.docs.some(d => {
+          if(d.id === participantDocId) return false;
+          const otherCreated = createdMs(d, 0);
+          return otherCreated < myCreated || (otherCreated === myCreated && d.id < participantDocId);
+        });
+        if(takenByOther) {
+          await deleteDoc(docRef);
+          participantDocId = null;
+          alert('방금 다른 분이 같은 닉네임으로 입장했습니다. 다른 닉네임을 사용해주세요.');
+          entering = false;
+          enterBtn.disabled = false;
+          enterBtn.textContent = '입장하기 🎉';
+          return;
         }
-      } catch(e) { /* 정리 실패해도 입장은 계속 */ }
+      } catch(e) { /* 확인 실패해도 입장은 계속 */ }
     }
     localStorage.setItem('sumit_nickname', nickname);
     localStorage.setItem('sumit_gender', gender);
@@ -579,6 +577,7 @@ enterBtn.addEventListener('click', async () => {
     localStorage.setItem('sumit_docId', participantDocId);
     localStorage.setItem('sumit_secondParty', secondParty);
     localStorage.setItem('sumit_realName', realName);
+    localStorage.setItem('sumit_phone', phoneNumber);
     localStorage.setItem('sumit_age', age);
     hide(entry);
     show(main);
@@ -1710,6 +1709,7 @@ leaveBtn.addEventListener('click', async () => {
   localStorage.removeItem('sumit_secondParty');
   localStorage.removeItem('sumit_isStaff');
   localStorage.removeItem('sumit_groupKey');
+  localStorage.removeItem('sumit_phone');
   location.reload();
 });
 
@@ -1836,7 +1836,6 @@ async function resetFloorState(targetFloor, options = {}) {
   await Promise.allSettled([
     deleteDoc(doc(db, 'settings', getTableRotationDoc(targetFloor))),
     deleteDoc(doc(db, 'settings', getSignalVoteDoc(targetFloor))),
-    deleteDoc(doc(db, 'settings', 'timer_' + targetFloor)),
     setDoc(doc(db, 'settings', 'secondPart_' + targetFloor), { active: false }),
     setDoc(doc(db, 'settings', getImageGameDoc(targetFloor)), { questionIdx: 0 }),
     setDoc(doc(db, 'settings', getBalanceGameDoc(targetFloor)), { questionIdx: 0 })
@@ -1845,7 +1844,7 @@ async function resetFloorState(targetFloor, options = {}) {
 
 clearAllBtn.addEventListener('click', async () => {
   const floorName = getFloorFullName(adminFloor);
-  if(!confirm(`${floorName}의 모든 기록을 삭제하시겠습니까?\n\n참가자, 요청, 선택, 투표, 로테이션, 타이머, 게임 진행 상태가 초기화됩니다.\n이 작업은 되돌릴 수 없습니다.`)) return;
+  if(!confirm(`${floorName}의 모든 기록을 삭제하시겠습니까?\n\n참가자, 요청, 선택, 투표, 로테이션, 게임 진행 상태가 초기화됩니다.\n이 작업은 되돌릴 수 없습니다.`)) return;
   
   try {
     await resetFloorState(adminFloor, { includeParticipants: true });
@@ -1894,7 +1893,6 @@ function loadAdminRealtime() {
   listenTableMap(true);
   listenGamesAdmin();
   listenParty2Admin();
-  listenAdminTimer();
 
   if(adminParticipantsUnsub) { adminParticipantsUnsub(); adminParticipantsUnsub = null; }
 
@@ -2527,150 +2525,6 @@ function listenCupidArrows() {
   });
 }
 
-// 타이머 기능 (층별 분리)
-let timerFirstLoad = true;
-let lastRemaining = -1;
-
-// listenTimer: onSnapshot을 한 번만 등록하고 endTime을 변수에 저장
-// setInterval에서 저장된 endTime으로 화면 업데이트 (매 초 새 리스너 생성 방지)
-function listenTimer() {
-  if(!floor) return;
-  if(_timerUnsub) { _timerUnsub(); _timerUnsub = null; }
-  const timerDocId = 'timer_' + floor;
-  timerFirstLoad = true;
-  lastRemaining = -1;
-
-  _timerUnsub = onSnapshot(doc(db, 'settings', timerDocId), (docSnap) => {
-    if(!docSnap.exists() || !docSnap.data().active) {
-      _timerIsActive = false;
-      _timerEndTime = 0;
-      timerDisplay?.classList.add('hidden');
-      timerAlertShown = false;
-      timerFirstLoad = false;
-      lastRemaining = -1;
-      return;
-    }
-    const data = docSnap.data();
-    _timerEndTime = data.endTime;
-    _timerIsActive = true;
-    timerDisplay?.classList.remove('hidden');
-    const remaining = Math.max(0, Math.floor((_timerEndTime - Date.now()) / 1000));
-    if(timerFirstLoad) {
-      timerFirstLoad = false;
-      lastRemaining = remaining;
-      if(remaining <= 0) {
-        timerAlertShown = true;
-        timerText.textContent = '00:00';
-        timerText.style.color = '#ff6464';
-      }
-    }
-  });
-}
-
-// 관리자 타이머 시작 (층별)
-startTimerBtn?.addEventListener('click', async () => {
-  if(!adminFloor) { alert('층을 먼저 선택하세요'); return; }
-  _adminTimerAutoRotateDone = false;
-  const mins = parseInt(timerMinutes.value) || 13;
-  const endTime = Date.now() + mins * 60 * 1000;
-  const timerDocId = 'timer_' + adminFloor;
-  try {
-    await setDoc(doc(db, 'settings', timerDocId), { active: true, endTime, minutes: mins });
-    const floorName = getFloorText(adminFloor);
-    adminTimerStatus.textContent = `⏱️ ${floorName} ${mins}분 타이머 실행중`;
-    adminTimerStatus.style.color = '#4ade80';
-  } catch(err) {
-    console.error('Timer start error:', err);
-  }
-});
-
-// 관리자 타이머 중지 (층별)
-stopTimerBtn?.addEventListener('click', async () => {
-  if(!adminFloor) return;
-  _adminTimerAutoRotateDone = false;
-  const timerDocId = 'timer_' + adminFloor;
-  try {
-    await setDoc(doc(db, 'settings', timerDocId), { active: false, endTime: 0 });
-    adminTimerStatus.textContent = '타이머 중지됨';
-    adminTimerStatus.style.color = '#ff9ebc';
-  } catch(err) {
-    console.error('Timer stop error:', err);
-  }
-});
-
-// 관리자 타이머 상태 (층별) — onSnapshot 한 번만 등록, endTime 변수에 저장
-function listenAdminTimer() {
-  if(!adminFloor) return;
-  if(_adminTimerUnsub) { _adminTimerUnsub(); _adminTimerUnsub = null; }
-  const timerDocId = 'timer_' + adminFloor;
-  _adminTimerUnsub = onSnapshot(doc(db, 'settings', timerDocId), (docSnap) => {
-    if(!docSnap.exists() || !docSnap.data().active) {
-      _adminTimerIsActive = false;
-      _adminTimerEndTime = 0;
-      if(adminTimerStatus) adminTimerStatus.textContent = '타이머 대기중';
-      return;
-    }
-    const data = docSnap.data();
-    _adminTimerEndTime = data.endTime;
-    _adminTimerIsActive = true;
-  });
-}
-
-// 타이머 화면 1초마다 업데이트 (Firebase 재호출 없이 저장된 endTime 사용)
-setInterval(() => {
-  if(_timerIsActive && _timerEndTime) {
-    const remaining = Math.max(0, Math.floor((_timerEndTime - Date.now()) / 1000));
-    const mins = Math.floor(remaining / 60);
-    const secs = remaining % 60;
-    timerText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-    timerText.style.color = remaining <= 60 ? '#ff6464' : '#fff';
-    const timerDisplay = document.getElementById('timerDisplay');
-    if(timerDisplay) {
-      if(remaining <= 60 && remaining > 0) timerDisplay?.classList.add('round-ending');
-      else timerDisplay?.classList.remove('round-ending');
-    }
-
-    if(remaining <= 0 && lastRemaining > 0 && !timerAlertShown) {
-      timerAlertShown = true;
-      timerText.textContent = '00:00';
-      timerText.style.color = '#ff6464';
-      if(navigator.vibrate) navigator.vibrate([500, 200, 500, 200, 500]);
-      try {
-        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdnd3eHlzb2tnaWxucHJycnBua2hoampqampra2tsbGxsbGxsbGxsbGtra2tra2pqamlpaWhoaGdnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnZ2dnaGhoaWlpamlqamtrbGxtbW1tbW1tbGtra2ppaWhoZ2dnZmZmZWVlZGRkY2NjYmJiYmFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWBgYGBgYGBgYGBgYGBgYGBgYGBgYF9fX19fX19fX19fX19fX19fXw==');
-        audio.volume = 0.5;
-        audio.play().catch(() => {});
-      } catch(e) {}
-      let msg = '🔔 현재 라운드가 종료되었습니다!';
-      if(gender === 'male') msg += '\n\n👨 남성 참가자분들은 다음 테이블로 이동해주세요!';
-      alert(msg);
-    } else if(remaining > 0) {
-      timerAlertShown = false;
-    }
-    lastRemaining = remaining;
-  }
-
-  if(_adminTimerIsActive && _adminTimerEndTime && adminFloor) {
-    const remaining = Math.max(0, Math.floor((_adminTimerEndTime - Date.now()) / 1000));
-    if(adminTimerStatus && adminPanel && !adminPanel.classList.contains('hidden')) {
-      const mins = Math.floor(remaining / 60);
-      const secs = remaining % 60;
-      const floorName = getFloorText(adminFloor);
-      adminTimerStatus.textContent = `⏱️ ${floorName} 남은시간: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-      adminTimerStatus.style.color = remaining <= 60 ? '#ff6464' : '#4ade80';
-    }
-    if(remaining <= 0 && !_adminTimerAutoRotateDone) {
-      _adminTimerAutoRotateDone = true;
-      showToast('⏰ 라운드 종료 — 자동 로테이션 중...', '#ffc107');
-      computeTableRotation().then(async () => {
-        try {
-          await setDoc(doc(db, 'settings', 'timer_' + adminFloor), { active: false, endTime: 0 });
-        } catch(e) {}
-      }).catch(() => {});
-    }
-  }
-}, 1000);
-
-
 // 2부 파티 상태 리스너 (참가자용)
 function listenSecondPartStatus() {
   if(!floor) return;
@@ -3186,6 +3040,7 @@ function listenTableRotationAdmin() {
     const lastTableInput = document.getElementById('lastTableInput');
     if(!snap.exists()) {
       if(moveStatusEl) moveStatusEl.style.display = 'none';
+      if(lastTableInput && document.activeElement !== lastTableInput) lastTableInput.value = '';
       return;
     }
     const data = snap.data();
@@ -3196,8 +3051,9 @@ function listenTableRotationAdmin() {
       moveStatusEl.style.color = '#10b981';
       moveStatusEl.textContent = `✅ ${round}R 완료`;
     }
-    if(lastTableInput && data.manualLastTable) {
-      lastTableInput.value = data.manualLastTable;
+    // 저장된 값만 표시 → 입력만 하고 저장 안 한 값이 저장된 것처럼 보이지 않게
+    if(lastTableInput && document.activeElement !== lastTableInput) {
+      lastTableInput.value = data.manualLastTable || '';
     }
   });
 
@@ -3291,13 +3147,11 @@ async function computeTableRotation() {
     return;
   }
 
-  // 관리자가 설정한 마지막 테이블 우선, 없으면 남성 참가자 기준 자동 계산
-  const lastTable = manualLastTable
-    ? manualLastTable
-    : Math.max(...males.map(m => getParticipantCurrentTableValue(m)).filter(Boolean));
+  // 마지막 테이블은 관리자가 저장한 값만 사용 (자동 계산 시 빈 테이블을 건너뛸 수 있음)
+  const lastTable = manualLastTable;
 
   if(!lastTable) {
-    showRotationStatus('⚠️ 마지막 테이블 번호를 먼저 설정해주세요', '#f87171', 'rgba(239,68,68,0.15)');
+    showRotationStatus('⚠️ 마지막 테이블 번호를 입력하고 저장 버튼을 먼저 눌러주세요', '#f87171', 'rgba(239,68,68,0.15)');
     await setDoc(settingsRef, { rotationLockUntil: Date.now() + 1000 }, { merge: true });
     computeRotationBusy = false;
     if(computeBtn) { computeBtn.disabled = false; computeBtn.textContent = '남자 한 칸 이동'; }
@@ -3323,7 +3177,7 @@ async function computeTableRotation() {
     round: newRound,
     active: false,
     lastTable,
-    manualLastTable: manualLastTable || lastTable,
+    manualLastTable: lastTable,
     movedCount: males.length,
     assignments,
     updatedAt: Date.now(),

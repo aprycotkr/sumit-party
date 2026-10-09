@@ -75,11 +75,10 @@ function enhanceHomeGreeting(card) {
   return card;
 }
 
-function buildHomeRoundInfo(timerCard, tableCard) {
-  if (!timerCard && !tableCard) return null;
+function buildHomeRoundInfo(tableCard) {
+  if (!tableCard) return null;
   const wrap = document.createElement('div');
   wrap.className = 'home-round-info';
-  appendIf(wrap, timerCard);
   appendIf(wrap, tableCard);
   return wrap;
 }
@@ -152,7 +151,6 @@ function buildParticipantShell() {
   const morePage = createRoutePage(pages.find(page => page.route === '/more'));
 
   const greetingCard = enhanceHomeGreeting(document.getElementById('greeting')?.closest('.card'));
-  const timerCard = document.getElementById('timerDisplay');
   const tableRotationCard = document.getElementById('tableRotationCard');
   const editCard = document.getElementById('newNickInput')?.closest('.card');
   const tableMapCard = document.getElementById('participantTableMap')?.closest('.card');
@@ -174,7 +172,7 @@ function buildParticipantShell() {
   if (requestRow) requestRow.classList.add('more-request-row');
 
   appendIf(homePage, greetingCard);
-  appendIf(homePage, buildHomeRoundInfo(timerCard, tableRotationCard));
+  appendIf(homePage, buildHomeRoundInfo(tableRotationCard));
   appendIf(homePage, buildHomePartyCard());
   appendIf(homePage, statsCard);
   appendIf(homePage, leaveCard);

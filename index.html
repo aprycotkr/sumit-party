@@ -62,7 +62,7 @@
         <option value="busan">부산점</option>
         <option value="gumi">구미점</option>
       </select>
-      <label>🔑 입장 PIN 번호 <span style="font-size:11px; font-weight:500; color:rgba(255,255,255,0.45);">(스탭에게 문의)</span></label>
+      <label>🔑 입장 PIN 번호 <span style="font-size:11px; font-weight:500; color:rgba(255,255,255,0.45);">(빔프로젝터 접속코드 확인)</span></label>
       <input id="entryPin" type="text" inputmode="numeric" pattern="[0-9]*" placeholder="4자리 입력" style="margin-bottom:20px; letter-spacing:6px; font-size:24px; font-weight:800; text-align:center;" maxlength="4" autocomplete="one-time-code" />
       <button id="enterBtn" style="padding:16px; font-size:16px; font-weight:700;">파티 입장하기</button>
     </div>
@@ -460,16 +460,6 @@
         </div>
       </div>
 
-      <div class="admin-panel-card timer">
-        <h3>⏱️ 라운드 타이머</h3>
-        <div class="admin-timer-row">
-          <input id="timerMinutes" type="number" min="1" max="60" value="13" />
-          <span>분</span>
-          <button id="startTimerBtn">▶️ 시작</button>
-          <button id="stopTimerBtn" class="secondary">⏹️ 중지</button>
-        </div>
-        <div id="adminTimerStatus">타이머 대기중</div>
-      </div>
 
       <div class="admin-danger-zone">
         <button id="clearAllBtn">모든 기록 삭제</button>

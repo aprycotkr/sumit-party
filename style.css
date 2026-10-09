@@ -211,19 +211,9 @@ button:focus-visible,a:focus-visible{outline:2px solid rgba(255,46,126,.8);outli
 .second-party-subtitle{position:relative;z-index:1;margin-top:5px;color:var(--ink-2);font-size:13px;font-weight:600;line-height:1.35}
 #teamNumberText{position:relative;z-index:1;margin-top:12px!important;padding-top:12px;border-top:1px solid rgba(255,255,255,.09);color:var(--gold-soft)!important;font-family:var(--font-display);font-weight:700;font-size:22px!important;letter-spacing:-.01em;text-shadow:0 0 24px rgba(255,221,154,.25)}
 
-/* ---------- home · round info (timer + table) ---------- */
+/* ---------- home · round info (table) ---------- */
 .home-round-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:0 0 10px}
-.home-round-info>.hidden+#tableRotationCard,
 .home-round-info>#tableRotationCard:only-child{grid-column:1/-1}
-#timerDisplay{
-  display:flex!important;flex-direction:column;align-items:center;justify-content:center;
-  height:100%;min-height:96px;margin:0!important;padding:14px 12px!important;
-  border-radius:16px!important;border:1px solid rgba(255,46,126,.4)!important;
-  background:linear-gradient(150deg,rgba(255,46,126,.17),rgba(139,92,246,.09))!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);text-align:center!important;
-}
-#timerDisplay>div:first-child{width:100%;margin:0 0 8px!important;color:var(--accent-soft)!important;font-size:11px!important;font-weight:800!important;letter-spacing:.02em;line-height:1.25}
-#timerText{font-family:var(--font-display);font-weight:700;font-size:24px!important;line-height:1.05!important;letter-spacing:-.01em;text-shadow:0 0 20px rgba(255,46,126,.3)!important}
 #partyStatus{display:none!important}
 #tableRotationCard{
   display:flex!important;flex-direction:column;align-items:center;justify-content:center;
@@ -575,14 +565,11 @@ button:focus-visible,a:focus-visible{outline:2px solid rgba(255,46,126,.8);outli
 #adminPinDate{font-size:12px;color:var(--ink-2);margin-top:6px}
 #regenPinBtn{width:auto;margin-top:12px;padding:8px 18px;background:rgba(255,194,75,.2);border:1px solid var(--gold);color:var(--gold);font-size:13px;box-shadow:none}
 .admin-panel-card.party{border-color:rgba(61,220,151,.4);background:linear-gradient(135deg,rgba(61,220,151,.13),rgba(61,220,151,.04));text-align:center}
-#party2AdminStatus,#adminTimerStatus{font-size:13px;color:var(--ink-2);margin-bottom:12px;text-align:center}
-.admin-button-row,.admin-timer-row,.admin-danger-zone{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+#party2AdminStatus{font-size:13px;color:var(--ink-2);margin-bottom:12px;text-align:center}
+.admin-button-row,.admin-danger-zone{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .admin-button-row button,.admin-danger-zone button{flex:1;min-width:130px}
 .secondary,.secondary-danger{background:#4a4458!important;box-shadow:none!important}
 .secondary-danger{border:1px solid rgba(255,92,92,.5)!important;color:#ff8787!important;background:rgba(255,92,92,.16)!important}
-.admin-panel-card.timer{border-color:rgba(255,46,126,.4);background:linear-gradient(135deg,rgba(255,46,126,.12),rgba(255,46,126,.04))}
-.admin-timer-row input{width:80px;text-align:center;font-weight:900}
-.admin-timer-row button{flex:1;min-width:96px}
 .admin-danger-zone{padding:12px;border-radius:14px;background:rgba(255,92,92,.07);border:1px solid rgba(255,92,92,.2)}
 .admin-danger-zone button:first-child{background:#e04545}
 .admin-danger-zone button:last-child{background:#e08b28}
@@ -666,8 +653,6 @@ details.edit-settings-card>.edit-settings-body{margin-top:14px;padding-top:14px;
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,100,100,.7)}70%{box-shadow:0 0 0 10px rgba(255,100,100,0)}100%{box-shadow:0 0 0 0 rgba(255,100,100,0)}}
-@keyframes timerPulse{0%,100%{border-color:#ff2e7e;box-shadow:0 0 10px rgba(255,46,126,.3)}50%{border-color:#ff6464;box-shadow:0 0 30px rgba(255,100,100,.7),0 0 60px rgba(255,46,126,.3)}}
-#timerDisplay.round-ending{animation:timerPulse 1s ease-in-out infinite}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(12px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 @media (prefers-reduced-motion:reduce){
